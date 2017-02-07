@@ -1,0 +1,32 @@
+{
+  "name": "neptis-planner",
+  "description": "Back-end for the planner service of Neptis Project",
+  "main": "main.js",
+  "authors": [
+    "Thomas Collerton"
+  ],
+  "license": "MIT",
+  "homepage": "",
+  "private": true,
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "bootstrap": "^3.3.7",
+    "angular": "^1.6.1",
+    "angular-ui-select": "^0.19.6",
+    "angular-ui-notification": "^0.3.5",
+    "angular-sanitize": "^1.6.1",
+    "leaflet": "0.7",
+    "angular-leaflet-directive": "^0.10.0",
+    "ui-leaflet": "^2.0.0",
+    "leaflet-providers": "^1.1.15",
+    "angular-animate": "^1.6.1",
+    "angular-bootstrap": "^2.5.0",
+    "angular-simple-logger": "^0.1.7"
+  }
+}

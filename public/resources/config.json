@@ -1,0 +1,6 @@
+{
+    "serverName": "http://localhost:8080/RestNeptis/webresources/",
+    "portNumber": "9070",
+    "serverUrl": "http://localhost:8080/",
+    "serverNode": "http://neptistest.asuscomm.com:9070/"
+}

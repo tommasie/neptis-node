@@ -1,0 +1,37 @@
+{
+  "name": "neptis-planner",
+  "version": "1.0.0",
+  "description": "Back-end for the planner service of Neptis Project",
+  "main": "main.js",
+  "dependencies": {
+    "body-parser": "^1.16.0",
+    "express": "^4.14.0",
+    "express-session": "^1.15.0",
+    "gulp-less": "^3.3.0",
+    "line-by-line": "^0.1.5",
+    "moment": "^2.17.1",
+    "morgan": "^1.7.0",
+    "portscanner": "^2.1.1",
+    "process": "^0.11.9",
+    "request": "^2.79.0",
+    "shelljs": "^0.7.6",
+    "winston": "^2.3.1"
+  },
+  "devDependencies": {
+    "gulp": "^3.9.1",
+    "gulp-clean-css": "^2.3.2",
+    "gulp-concat": "^2.6.1",
+    "gulp-filter": "^5.0.0",
+    "gulp-load-plugins": "^1.4.0",
+    "gulp-rename": "^1.2.2",
+    "gulp-uglify": "^2.0.1",
+    "main-bower-files": "^2.13.1",
+    "neo4j": "^2.0.0-RC2",
+    "pump": "^1.0.2"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Thomas Collerton",
+  "license": "MIT"
+}

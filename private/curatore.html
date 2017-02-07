@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<!--
+To change this license header, choose License Headers in Project Properties.
+To change this template file, choose Tools | Templates
+and open the template in the editor.
+-->
+<html>
+    <head>
+        <title> Private Area</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <script src="/js/jquery.js"></script>
+        <script src="/js/angular.js"></script>
+        <script src="/js/angular-animate.js"></script>
+        <script src="/angular/controller/myAdminPageController.js"></script>
+        <script src="preferences.js"></script>
+        <script src="/js/ui-bootstrap-tpls.js"></script>
+        <link rel="stylesheet" href="/css/bootstrap.css">
+        <script src="/js/bootstrap.js"></script>
+        <link href="/private.css" rel="stylesheet" type="text/css">
+        <style>
+            body {
+                padding: 15px;
+            }
+        </style>
+
+    </head>
+    <body ng-app="myAdminPage">
+        <div id = "titolo" align = "center" style="font-family:Arial; font-size:50px" > NEPTIS </div>
+        <nav class="navbar navbar-default  navbar-static-top" style="top:-23px;height: 51px">
+            <div class="container-fluid" >
+              <a class="navbar-brand" href="#">NEPTIS</a>
+              <ul class="nav navbar-nav">
+                <li class='active'><a href='curatore'>Home</a></li>
+                <li class><a href='creation'> Create</a></li>
+                <li><a href='modification'> Modify</a></li>
+                <li><input type='button' value='Logout' class="btn btn-warning" style="margin-left:700px;margin-top: 10px" data-toggle="modal" data-target="#logout">
+              </ul>
+            </div>
+        </nav>
+        <div id="logout" class="modal fade" role="dialog" ng-controller="myAdminPageController">
+            <div class="modal-dialog modal-sm">
+                <!-- Modal content-->
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <button type="button" class="close" data-dismiss="modal">&times;</button>
+                            <h4 class="modal-title">Logout</h4>
+                    </div>
+                    <div class="modal-body">
+                        <p>Are you sure you want to logout? </p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type='button' class="btn btn-success" ng-click="logout()" > Confirm </button>
+                        <!-- <button type="button" class="btn btn-default" data-dismiss="modal">Close</button> !-->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div style='float:left;width:90%;margin-top: 100px;margin-left: 30px'>
+        <p>  Welcome to your personal page.Now you can create or modify
+                information about your domain of interest,in particoular
+                you could add new cities,museums and areas.
+		When you have completed a creation or a modification of a new entity, please, click on the Finish button.</p>
+
+        </div>
+    </body>
+</html>

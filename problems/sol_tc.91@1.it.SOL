@@ -1,0 +1,21 @@
+
+; Version LPG-td-1.0
+; Seed 19702208
+; Command line: ./lpg -o neptis/domain.pddl -f /home/thomas/tesi/problems/city/bracciano-tc.91@1.it.pddl -quality -out neptis/sol_tc.91@1.it 
+; Problem /home/thomas/tesi/problems/city/bracciano-tc.91@1.it.pddl
+; Actions having STRIPS duration
+; Time 0.51
+; Plan generation time 0.04
+; Search time 0.03
+; Parsing time 0.01
+; Mutex time 0.00
+; MetricValue -3.00
+
+0:   (MOVEAR START BRACCIANO) [1]
+1:   (ENTRA BRACCIANO) [1]
+2:   (MOVEAA BRACCIANO MUSEO_CIVICO) [1]
+3:   (VISITA MUSEO_CIVICO BRACCIANO) [1]
+4:   (MOVEAT MUSEO_CIVICO CASTELLO_ODESCALCHI BRACCIANO) [1]
+5:   (VISITA CASTELLO_ODESCALCHI BRACCIANO) [1]
+6:   (MOVEAT CASTELLO_ODESCALCHI CASA BRACCIANO) [1]
+7:   (VISITA CASA BRACCIANO) [1]

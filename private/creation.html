@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html ng-app="myCreation">
+<head>
+  <title>Create content</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- <script type="text/javascript"
+ 		 src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD0xbJJwC7pQBzNFupb2s7orzOvB_ctSb4&libraries=geometry">
+		</script> -->
+  <script src="/js/jquery.js"></script>
+  <script src="/js/angular.js"></script>
+  <script src="/js/angular-sanitize.js"></script>
+  <link rel="stylesheet" href="/css/leaflet.css" />
+  <script src="/js/leaflet-src.js"></script>
+  <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-plugins/2.0.0/layer/tile/Google.min.js"></script> -->
+  <script src="/js/angular-simple-logger.js"></script>
+  <script src="/js/ui-leaflet.js"></script>
+  <script src="/js/ui-leaflet-layers.min.js"></script>
+  <script src="/angular/controller/myStructureController.js"></script>
+  <script src="/js/ui-bootstrap.js"></script>
+  <script src="/js/ui-bootstrap-tpls.js"></script>
+  <link rel="stylesheet" href="/css/bootstrap.css">
+  <script src="/js/angular-ui-notification.js"></script>
+  <script src="preferences.js"></script>
+  <link href="/private.css" rel="stylesheet" type="text/css">
+  <script src="/js/select.js"></script>
+  <link href="/css/select.css" rel="stylesheet" type="text/css">
+  <style>
+    body {
+      padding: 15px;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="titolo" align="center" style="font-family:Arial; font-size:50px"> NEPTIS </div>
+  <nav class="navbar navbar-default  navbar-static-top" style="top:-23px;height: 51px">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="#">NEPTIS</a>
+      <ul class="nav navbar-nav">
+        <li><a href='curatore'>Home</a></li>
+        <li class="active"><a href='creation'> Create</a></li>
+        <li><a href='modification'> Modify</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <div class="container">
+    <form name="create" id="create">
+      <div ng-controller="myStructureCtrl" class="container">
+
+        <!-- Structure -->
+        <ui-select ng-model="structure.selected" theme="bootstrap" ng-disabled="disabled" reset-search-input="false" style="width: 300px;">
+          <ui-select-match placeholder="Select a structure...">{{$select.selected.name}}</ui-select-match>
+          <ui-select-choices repeat="struct in structure | filter: $select.search" refresh-delay="0">
+            <div ng-bind-html="struct.name | highlight: $select.search"></div>
+          </ui-select-choices>
+        </ui-select>
+
+        <!-- Region -->
+        <ui-select ng-model="regions.selected" ng-change="importCity(regions.selected.name)" theme="bootstrap" ng-disabled="disabled" reset-search-input="false" style="width: 300px;">
+          <ui-select-match placeholder="Select a region...">{{$select.selected.name}}</ui-select-match>
+          <ui-select-choices repeat="regione in region | filter: $select.search" refresh-delay="0">
+            <div ng-bind-html="regione.name | highlight: $select.search"></div>
+          </ui-select-choices>
+        </ui-select>
+
+        <!-- City -->
+        <ui-select ng-model="comune.selected" theme="bootstrap" ng-disabled="disabled" reset-search-input="false" style="width: 300px;" on-select="onSelected($item)">
+          <ui-select-match placeholder="Enter a city...">{{$select.selected.name}}</ui-select-match>
+          <ui-select-choices repeat="comune in comuni | filter: $select.search" refresh-delay="0">
+            <div ng-bind-html="comune.name | highlight: $select.search"></div>
+          </ui-select-choices>
+        </ui-select>
+
+        <div class="col-xs-4">
+          <div id='museumForm' ng-show="structure.selected.name =='Museum' || structure.selected.name == 'Opened Museum'" style='margin-top: 30px'>
+            <label for='museumName' style="display:inline;margin-left:-15px"> Museum name </label>
+            <input id='museumName' style="margin-left:-15px" class='form-control' name='museumName' ng-model="museumName" type="text" placeholder="Insert a museum">
+          </div>
+
+          <div id='noAreaDiv' ng-show="structure.selected.name == 'Museum' ">
+            <label style='display:inline-block;margin-left: -15px'>This museum has no areas</label>
+            <input type='checkbox' style='display:inline-block;margin-left: 15px' ng-model="noArea" ng-show="structure.selected.name =='Museum'" name='noArea' value='noArea'>
+          </div>
+
+          <div id='addArea' ng-show="(structure.selected.name=='Museum' || structure.selected.name == 'Opened Museum') && !noArea" style='margin-top: 30px'>
+            <label for='areaName' style="display:inline;margin-left:-15px"> Area name </label>
+            <input id='areaName' style="margin-left:-15px" class='form-control' name='areaName' ng-model="areaName" type="text" placeholder="Insert a new area">
+            <input type='button' class="btn btn-default" id='submit' value='Add room' ng-click="addRoom()" style='margin-left: 300px'>
+          </div>
+
+          <div id='addAttraction' style='margin-top: 30px'>
+            <label for='attractionName' style="display:inline;margin-left:-15px"> Attraction name </label>
+            <input id='attractionName' style="margin-left:-15px" class='form-control' name='attractionName' ng-model="attractionName" type="text" placeholder="Insert a new attraction" required>
+          </div>
+
+          <ui-select ng-model="rooms.roomA" theme="bootstrap" ng-disabled="disabled" reset-search-input="false" style="width: 300px;"
+                      ng-show="structure.selected.name=='Museum'&& addedRooms">
+            <ui-select-match placeholder="Select a structure...">{{$select.selected.name}}</ui-select-match>
+            <ui-select-choices repeat="room in rooms.currRooms | filter: $select.search" refresh-delay="0">
+              <div ng-bind-html="room.name | highlight: $select.search"></div>
+            </ui-select-choices>
+          </ui-select>
+
+          <ui-select ng-model="rooms.roomB" theme="bootstrap" ng-disabled="disabled" reset-search-input="false" style="width: 300px;"
+                      ng-show="structure.selected.name=='Museum' && addedRooms">
+            <ui-select-match placeholder="Select a structure...">{{$select.selected.name}}</ui-select-match>
+            <ui-select-choices repeat="room in rooms.currRooms | filter: $select.search | filter: filterRooms" refresh-delay="0">
+              <div ng-bind-html="room.name | highlight: $select.search"></div>
+            </ui-select-choices>
+          </ui-select>
+
+          <input type='button' class="btn btn-default" id='submit' value='Add link' ng-click="addRoomLink()" style='margin-left: 300px'
+                    ng-show="structure.selected.name=='Museum' && addedRooms">
+                    
+        <input type='button' class="btn btn-default" id='submit' value='Add links' ng-click="parser2(structure.selected.name)" style='margin-left: 300px'
+                  ng-show="structure.selected.name=='Museum' && addedRooms">
+
+
+          <div ng-if="structure.selected.name == 'City' " id="map" style='margin-top: 30px'>
+            <label style="display:inline;margin-left:-15px"> Attraction location </label>
+            <leaflet style="margin-left:-15px" height='500px' width='1000px' center='center' event-broadcast='events' markers='markers'></leaflet>
+          </div>
+
+          <div id='add' style='margin-top: 30px'>
+            <input type='button' class="btn btn-default" id='submit' value='Add new instance' ng-click="add2(structure.selected.name)" style='margin-left: 300px' ng-disabled="create.$invalid">
+          </div>
+
+          <div id='confirmation' style='margin-top: 30px'>
+            <input type='button' class="btn btn-default" id='submit' value='End instances' ng-click="add(structure.selected.name)" style='margin-left: 300px'>
+          </div>
+
+          <div id='finish' style='margin-top: 30px'>
+            <input type='button' class="btn btn-default" id='submit' value='Finish' ng-click="parser(structure.selected.name)" style='margin-left: 300px'>
+          </div>
+        </div>
+      </div>
+    </form>
+  </div>
+</body>
+
+</html>
