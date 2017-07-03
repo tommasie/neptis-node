@@ -2,10 +2,10 @@ var request = require('request');
 var app = require(__dirname + '/bootstrap');
 var config = require(__dirname + '/public/resources/config.json');
 var logger = require('./logger');
-var serverName = config.serverName;
-var portNumber = config.portNumber;
+
 var serverUrl = config.serverUrl;
-var serverNode = config.serverNode;
+var appName = config.webapp;
+var serverName = serverUrl  + appName;
 
 var pathName;
 
@@ -18,7 +18,7 @@ app.get('/get_city', function(req, res) {
     res.header("Access-Control-Allow-Credentials", true);
 
     request({
-        url: serverName + "entities.city",
+        url: serverName + "city",
         method: "GET",
         json: true,
         headers: [{
@@ -47,7 +47,7 @@ app.get('/get_museum', function(req, res) {
     res.header("Access-Control-Allow-Credentials", true);
 
     request({
-        url: serverName + "entities.museum",
+        url: serverName + "museum",
         method: "GET",
         json: true,
         headers: [{
@@ -84,7 +84,7 @@ app.post('/get_aream', function(req, res) {
     logger.info(path, "Museum id:", museumId);
 
     request({
-        url: serverName + "entities.aream/museumId=" + museumId,
+        url: serverName + "aream/museumId=" + museumId,
         method: "GET",
         json: true,
         headers: [{
@@ -116,7 +116,7 @@ app.post('/get_attractionm', function(req, res) {
     logger.info(pathName + "id area: ", area);
 
     request({
-        url: serverName + "entities.attractionm/areaId=" + area,
+        url: serverName + "attractionm/areaId=" + area,
         method: "GET",
         json: true,
         headers: [{
@@ -151,7 +151,7 @@ app.get('/get_oam', function(req, res) {
     res.header("Access-Control-Allow-Credentials", true);
 
     request({
-        url: serverName + "entities.oam",
+        url: serverName + "oam",
         method: "GET",
         json: true,
         headers: [{
@@ -187,7 +187,7 @@ app.post('/get_areaOam', function(req, res) {
     logger.info(pathName + "[/get_areaOam] OAM id: ", museumId);
 
     request({
-        url: serverName + "entities.areaoam/museumId=" + museumId,
+        url: serverName + "areaoam/museumId=" + museumId,
         method: "GET",
         json: true,
         headers: [{
@@ -223,7 +223,7 @@ app.post('/get_attractionOam', function(req, res) {
     logger.info(pathName + "id area: ", area);
 
     request({
-        url: serverName + "entities.attractionoam/areaId=" + area,
+        url: serverName + "attractionoam/areaId=" + area,
         method: "GET",
         json: true,
         headers: [{
@@ -249,7 +249,7 @@ app.post('/get_attractionOam', function(req, res) {
     });
 });
 
-app.post('/get_attractionC', function(req, res) {
+app.get('/get_attractionC', function(req, res) {
     pathName = '[' + req.path + '] ';
     logger.info(pathName + req.method + " " + req.ip);
     res.setHeader('Content-Type', 'application/json');
@@ -259,7 +259,7 @@ app.post('/get_attractionC', function(req, res) {
     cityId = req.body.city;
     logger.info(pathName + "id city: ", cityId);
     request({
-        url: serverName + "entities.attractionc/cityId=" + cityId,
+        url: serverName + "attractionc/cityId=" + cityId,
         method: "GET",
         json: true,
         headers: [{

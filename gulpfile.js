@@ -9,56 +9,54 @@ var less = require('gulp-less');
 var mainBowerFiles = require('main-bower-files');
 var cleanCSS = require('gulp-clean-css');
 
-// Include plugins
-var plugins = require("gulp-load-plugins")({
-	pattern: ['gulp-*', 'gulp.*', 'main-bower-files'],
-	replaceString: /\bgulp[\-.]/
-});
+var browserify = require('browserify');
+var source = require('vinyl-source-stream');
+var streamify = require('gulp-streamify')
 
 // Define default destination folder
 var dest = 'public/';
-
-console.log(mainBowerFiles());
+var srcFolders = ['node_modules/angular/angular.js',
+					'']
 
 gulp.task('js', function(cb) {
-	pump([ 
-            gulp.src(mainBowerFiles()),
-            filter('**/*.js'),
-            //concat('test.js'),
-            uglify({mangle:false}),
-            gulp.dest(dest + 'js')
-            ],
-            cb);
+	console.log(mainBowerFiles);
+	pump([
+	gulp.src(mainBowerFiles()),
+		filter('**/*.js'),
+		//concat('test.js'),
+		uglify({mangle:false}),
+		gulp.dest(dest + 'js1')
+		],
+		cb);
 
 });
 
 gulp.task('css', function(cb) {
-	pump([ gulp.src(mainBowerFiles({
-            overrides: {
-                bootstrap: {
-                    main: [
-                        './dist/js/bootstrap.js',
-                        './dist/css/*.min.*',
-                        './dist/fonts/*.*'
-                    ]
-                }
-            }
-        })),
+	pump([ gulp.src(mainBowerFiles()),
 		filter('**/*.css'),
 		cleanCSS(),
-		gulp.dest(dest + 'css')
+		gulp.dest(dest + 'css1')
 		],
 		cb);
 });
 
 gulp.task('less', function(cb) {
+	console.log(mainBowerFiles());
 	pump([ gulp.src(mainBowerFiles()),
 		filter('**/*.less'),
 		less(),
-		gulp.dest(dest + 'css')
+		gulp.dest(dest + 'css1')
 		],
 		cb);
 });
 
+gulp.task('browserify', function() {
+	return browserify('browserify.js')
+		.bundle()
+		.pipe(source('bundle.js'))
+		.pipe(streamify(uglify()))
+		.pipe(gulp.dest('public/js/'));
+})
 
-gulp.task('default',['js','css']);
+
+gulp.task('default',['js','css','less']);

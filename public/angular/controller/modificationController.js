@@ -1,4 +1,4 @@
-var app = angular.module("myModification", ['ngSanitize', 'ui.select', 'ui-notification', 'preferences'])
+var app = angular.module("editApp", ['ngSanitize', 'ui.select', 'ui-notification', 'preferences','ui-leaflet'])
     //Configuration for angular-ui-notification
     .config(function (NotificationProvider) {
         NotificationProvider.setOptions({
@@ -44,16 +44,177 @@ app.filter('propsFilter', function() {
     };
 });
 
-app.controller("myModifyController", ['$scope','$log', '$http', 'Notification', 'SharedPreferences', 
+app.controller("curatorEditController", ['$scope','$log', '$http', 'Notification', 'SharedPreferences', 
                 function($scope, $log, $http, Notification, SharedPreferences) {
 
     $scope.server = SharedPreferences.nodeServer;
+    
+    angular.extend($scope, {
+        center: {
+            lat: 41.90,
+            lng: 12.4963,
+            zoom: 7
+        },
+        events: {
+            map: {
+                enable: ['zoomstart', 'drag', 'click', 'mousemove'],
+                logic: 'emit'
+            }
+        }
+        /*,
+        If more layers are needed, uncomment this and add layers='layers' to the leaflet tag in the HTML
+        layers: {
+            baselayers: {
+                osm: {
+                    name: 'OpenStreetMap',
+                    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                            //url: 'https://maps.wikimedia.org/osm-intl/{z}/{x}/{y}.png',
+                            //url: 'http://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
+                            //url: 'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
+                    type: 'xyz'
+                }/*,
+                googleRoadmap: {
+                    name: 'Google Streets',
+                    layerType: 'ROADMAP',
+                    type: 'google'
+                },
+                googleTerrain: {
+                    name: 'Google Terrain',
+                    layerType: 'TERRAIN',
+                    type: 'google'
+                },
+                googleHybrid: {
+                    name: 'Google Hybrid',
+                    layerType: 'HYBRID',
+                    type: 'google'
+                }    /
+            }
+        }*/
+    });
 
-    $scope.structure = [
-        {name: 'City'},
-        {name: 'Museum'},
-        {name: 'Opened Museum'}
+    $scope.region = [{
+            name: 'Abruzzo'
+        },
+        {
+            name: 'Basilicata'
+        },
+        {
+            name: 'Calabria'
+        },
+        {
+            name: 'Campania'
+        },
+        {
+            name: 'Emilia-Romagna'
+        },
+        {
+            name: 'Friuli-Venezia Giulia'
+        },
+        {
+            name: 'Lazio'
+        },
+        {
+            name: 'Liguria'
+        },
+        {
+            name: 'Lombardia'
+        },
+        {
+            name: 'Marche'
+        },
+        {
+            name: 'Molise'
+        },
+        {
+            name: 'Piemonte'
+        },
+        {
+            name: 'Puglia'
+        },
+        {
+            name: 'Sardegna'
+        },
+        {
+            name: 'Sicilia'
+        },
+        {
+            name: 'Toscana'
+        },
+        {
+            name: 'Trentino-Alto Adige'
+        },
+        {
+            name: 'Umbria'
+        },
+        {
+            name: "Valle d' Aosta"
+        },
+        {
+            name: 'Veneto'
+        }
     ];
+    $scope.regions = {};
+    $scope.regions.selected = "";
+
+    var comuniList = null;
+    $scope.comuni = [];
+    $scope.structure = {
+        selected: '',
+        structures: [
+            {
+                name: 'City'
+            },
+            {
+                name: 'Museum'
+            },
+            {
+               name: 'Opened Museum' 
+            }
+        ]
+    };
+
+    $scope.comune = {};
+    $scope.comune.selected = "";
+
+    $scope.importCity = function (region) {
+        $scope.comuni = [];
+        $scope.comune = [];
+        $http.get('/resources/italia_comuni.json')
+            .then(function (response) {
+                comuniList = response.data;
+                for (i = 0; i < comuniList.regioni.length; i++) {
+                    if (comuniList.regioni[i].nome === region) {
+                        for (j = 0; j < comuniList.regioni[i].province.length; j++) {
+                            for (k = 0; k < comuniList.regioni[i].province[j].comuni.length; k++) {
+                                item = {};
+                                item['region'] = comuniList.regioni[i].nome;
+                                item['name'] = comuniList.regioni[i].province[j].comuni[k].nome;
+
+                                $scope.comuni.push(item);
+                            }
+                        }
+                    }
+
+                }
+                $scope.comuni.sort(function (a, b) {
+                    if (a.name < b.name) //sort string ascending
+                        return -1;
+                    if (a.name > b.name)
+                        return 1;
+                    return 0;
+                });
+                //console.log("prova array ",$scope.comuni);
+
+                $scope.comuni.sort(function (a, b) {
+                    if (a.region < b.region)
+                        return -1;
+                    if (a.region > b.region)
+                        return 1;
+                    return 0;
+                });
+
+            });
+    };
 
     $scope.citySel = {};
     $scope.cityJSON = [];
@@ -69,6 +230,31 @@ app.controller("myModifyController", ['$scope','$log', '$http', 'Notification', 
         selected: undefined
     };
     $scope.attractionJSON = [];
+    
+    $scope.onSelected = function (selected) {
+        var apiKey = "AIzaSyD0xbJJwC7pQBzNFupb2s7orzOvB_ctSb4";
+        $http({
+                url: "https://maps.googleapis.com/maps/api/geocode/json?address=" + selected.name + "," + $scope.regions.selected.name + "&key=" + apiKey,
+                method: "GET",
+                responseType: "json"
+            })
+            .then(function (response) {
+                if (response.data.results.length > 0) {
+                    coords = response.data.results[0].geometry.location;
+                    $scope.center.lat = coords.lat;
+                    $scope.center.lng = coords.lng;
+                    $scope.center.zoom = 14;
+                }
+            });
+            
+        $http({
+            url: $scope.server + "get_city/",
+            method: "GET",
+            responseType: "json"
+        }).then(function(response) {
+            console.log(response);
+        });
+    }
     
     $scope.change = function() {
         struct = $scope.structure.selected.name;
@@ -273,13 +459,13 @@ app.controller("myModifyController", ['$scope','$log', '$http', 'Notification', 
     };
 
     $scope.changeArea = function(areaID) {
-        console.log("*** struttura selezionata,sono changeArea ", $scope.structure.selected.name);
+            $log.info("*** struttura selezionata,sono changeArea ", $scope.structure.selected.name);
         if ($scope.structure.selected.name === 'Museum') {
             $scope.attractionJSON = [];
             toSend = {
                 area: areaID
             };
-            console.log("id area direttamente da select ", areaID);
+            $log.info("id area direttamente da select ", areaID);
             $http({
                     url: $scope.server + 'get_attractionm',
                     method: "POST",
@@ -291,7 +477,6 @@ app.controller("myModifyController", ['$scope','$log', '$http', 'Notification', 
                     }
                 })
                 .then(function(response) {
-                    console.log("risposta dal server ", response.data[0].name);
                     attractionList = response.data;
                     for (i = 0; i < attractionList.length; i++) {
                         item = {};
@@ -306,7 +491,7 @@ app.controller("myModifyController", ['$scope','$log', '$http', 'Notification', 
                             return 1;
                         return 0;
                     });
-                    //serviva per provare parser-- console.log("minuti della coda prima attrazione ",response.data);
+                    //serviva per provare parser-- $log.info("minuti della coda prima attrazione ",response.data);
                 });
         }
         if ($scope.structure.selected.name === 'Opened Museum') {
@@ -314,7 +499,7 @@ app.controller("myModifyController", ['$scope','$log', '$http', 'Notification', 
             toSend = {
                 area: areaID
             };
-            console.log("id area direttamente da select ", areaID);
+            $log.info("id area direttamente da select ", areaID);
             $http({
                     url: $scope.server + 'get_attractionOam',
                     method: "POST",
@@ -326,7 +511,7 @@ app.controller("myModifyController", ['$scope','$log', '$http', 'Notification', 
                     }
                 })
                 .then(function(response) {
-                    console.log("risposta dal server ", response.data[0].name);
+                    $log.info("risposta dal server ", response.data[0].name);
                     attractionList = response.data;
                     for (i = 0; i < attractionList.length; i++) {
                         item = {};
@@ -341,7 +526,7 @@ app.controller("myModifyController", ['$scope','$log', '$http', 'Notification', 
                             return 1;
                         return 0;
                     });
-                    //serviva per provare parser-- console.log("minuti della coda prima attrazione ",response.data);
+                    //serviva per provare parser-- $log.info("minuti della coda prima attrazione ",response.data);
                 });
         }
 
@@ -349,7 +534,7 @@ app.controller("myModifyController", ['$scope','$log', '$http', 'Notification', 
 
     $scope.showAttraction = function(cityId) {
         $scope.attractionJSON = [];
-        console.log("id della citta scelta :", cityId);
+        $log.info("id della citta scelta :", cityId);
         toSend = {
             city: cityId
         };
@@ -364,22 +549,21 @@ app.controller("myModifyController", ['$scope','$log', '$http', 'Notification', 
                 }
             })
             .then(function(response) {
-                console.log("risposta dal server ", response.data[0].name);
                 attractionList = response.data;
                 for (i = 0; i < attractionList.length; i++) {
-                    item = {};
-                    item['attractionName'] = attractionList[i].name;
-                    item['attractionId'] = attractionList[i].id;
+                    item = {
+                        attractionName: attractionList[i].name,
+                        attractionId: attractionList[i].id
+                    };
                     $scope.attractionJSON.push(item);
                 }
                 $scope.attractionJSON.sort(function(a, b) {
-                    if (a.areaName < b.areaName) //sort string ascending
+                    if (a.areaName < b.areaName)
                         return -1;
                     if (a.areaName > b.areaName)
                         return 1;
                     return 0;
                 });
-                //serviva per provare parser-- console.log("minuti della coda prima attrazione ",response.data);
             });
     };
 
@@ -387,6 +571,7 @@ app.controller("myModifyController", ['$scope','$log', '$http', 'Notification', 
         if (!$scope.museumSel.selected) {
             return true;
         } else if ($scope.areaMSel.selected) {
+            $log.debug("checkDisablArea",$scope.areaMSel.selected);
             return true;
         }
         return false;
@@ -398,7 +583,6 @@ app.controller("myModifyController", ['$scope','$log', '$http', 'Notification', 
                 if (!$scope.attractionSel.selected) {
                     return false;
                 }
-                return true;
             }
             return true;
         }
@@ -420,9 +604,9 @@ app.controller("myModifyController", ['$scope','$log', '$http', 'Notification', 
         $event.stopPropagation();
         $scope.areaMSel.selected = undefined;
     };
+    
     /** when deleting a city,delete all instances of museum/attraction/oam  **/
     $scope.disable = function(attraction) {
-        console.log("**** test valore struttura", $scope.structure.selected.name);
         structure = $scope.structure.selected.name;
         if (structure === 'City') {
             cityId = $scope.citySel.selected.cityId;
@@ -435,7 +619,7 @@ app.controller("myModifyController", ['$scope','$log', '$http', 'Notification', 
                 name: name
             };
         }
-        if (structure === 'Museum' || structure === 'Opened Museum') {
+        else {
             areaId = $scope.areaMSel.selected.areaId;
             attrId = attraction.attractionId;
             name = attraction.attractionName;
@@ -458,7 +642,7 @@ app.controller("myModifyController", ['$scope','$log', '$http', 'Notification', 
                 }
             })
             .then(function(response) {
-                console.log("Attraction disabled ok");
+                $log.info("Attraction disabled ok");
             });
 
     };
@@ -467,7 +651,7 @@ app.controller("myModifyController", ['$scope','$log', '$http', 'Notification', 
 
         switch (structure) {
             case 'City':
-                //console.log(" attrazione inserita ",$scope.newAttr);
+                //$log.info(" attrazione inserita ",$scope.newAttr);
                 toSend = {
                     name: $scope.citySel.selected.cityName,
                     region: $scope.citySel.selected.region,
@@ -484,7 +668,7 @@ app.controller("myModifyController", ['$scope','$log', '$http', 'Notification', 
                         }
                     })
                     .then(function(response) {
-                        console.log("risposta dal server", response.data);
+                        $log.info("risposta dal server", response.data);
                         Notification.success({
                             message: 'Operation completed!',
                             delay: 2000
@@ -494,10 +678,10 @@ app.controller("myModifyController", ['$scope','$log', '$http', 'Notification', 
 
                 break;
             case 'Museum':
-                //console.log("valore checkbox ",$scope.noArea);
+                //$log.info("valore checkbox ",$scope.noArea);
                 // if check box noArea is selected,the area name is the name of museum
                 if ($scope.areaMSel.selected !== undefined) {
-                    console.log("citta ", $scope.museumSel.selected.city, " regione ", $scope.museumSel.selected.region, " area", $scope.areaMSel.selected.areaName, " museo ", $scope.museumSel.selected.museumName);
+                    $log.info("citta ", $scope.museumSel.selected.city, " regione ", $scope.museumSel.selected.region, " area", $scope.areaMSel.selected.areaName, " museo ", $scope.museumSel.selected.museumName);
                     toSend = {
                         city: $scope.museumSel.selected.city,
                         region: $scope.museumSel.selected.region,
@@ -525,7 +709,7 @@ app.controller("myModifyController", ['$scope','$log', '$http', 'Notification', 
                         }
                     })
                     .then(function(response) {
-                        console.log("risposta dal server aggiunta museo ", response.data);
+                        $log.info("risposta dal server aggiunta museo ", response.data);
                         Notification.success({
                             message: 'Operation completed!',
                             delay: 2000
@@ -553,7 +737,7 @@ app.controller("myModifyController", ['$scope','$log', '$http', 'Notification', 
                         }
                     })
                     .then(function(response) {
-                        console.log("*** risposta dal server aggiunta museo ", response.data, "***");
+                        $log.info("*** risposta dal server aggiunta museo ", response.data, "***");
                         Notification.success({
                             message: 'Operation completed!',
                             delay: 2000
@@ -569,7 +753,7 @@ app.controller("myModifyController", ['$scope','$log', '$http', 'Notification', 
 
         switch (structure) {
             case 'Museum':
-                console.log("sono in addNewArea ");
+                $log.info("sono in addNewArea ");
                 toSend = {
                     museumId: $scope.museumSel.selected.museumId,
                     area: $scope.newArea,
@@ -587,7 +771,7 @@ app.controller("myModifyController", ['$scope','$log', '$http', 'Notification', 
                         }
                     })
                     .then(function(response) {
-                        console.log("risposta dal server aggiunta area ", response.data);
+                        $log.info("risposta dal server aggiunta area ", response.data);
                         if (response.data.error === 0) {
                             Notification.success({
                                 message: 'Operation completed!',
@@ -622,7 +806,7 @@ app.controller("myModifyController", ['$scope','$log', '$http', 'Notification', 
                         }
                     })
                     .then(function(response) {
-                        console.log("*** risposta dal server aggiunta museo ", response.data, "***");
+                        $log.info("*** risposta dal server aggiunta museo ", response.data, "***");
                         if (response.data.error === 0) {
                             Notification.success({
                                 message: 'Operation completed!',
@@ -643,11 +827,11 @@ app.controller("myModifyController", ['$scope','$log', '$http', 'Notification', 
     };
 
     $scope.modifyAttraction = function(structure) {
-        console.log("sono modify attraction,struttura selezionata ", structure);
+        $log.info("sono modify attraction,struttura selezionata ", structure);
 
         switch (structure) {
             case 'City':
-                console.log("sono in modifyAttraction ");
+                $log.info("sono in modifyAttraction ");
                 toSend = {
                     cityId: $scope.citySel.selected.cityId,
                     category: structure,
@@ -666,7 +850,7 @@ app.controller("myModifyController", ['$scope','$log', '$http', 'Notification', 
                         }
                     })
                     .then(function(response) {
-                        console.log("risposta dal server modifica attrazione ", response.data);
+                        $log.info("risposta dal server modifica attrazione ", response.data);
                         if (response.data.error === 0) {
                             Notification.success({
                                 message: 'Operation completed!',
@@ -686,7 +870,7 @@ app.controller("myModifyController", ['$scope','$log', '$http', 'Notification', 
                 break;
 
             case 'Museum':
-                console.log("sono in modifyAttraction ");
+                $log.info("sono in modifyAttraction ");
                 toSend = {
                     city: $scope.museumSel.selected.city,
                     areaId: $scope.areaMSel.selected.areaId,
@@ -706,7 +890,7 @@ app.controller("myModifyController", ['$scope','$log', '$http', 'Notification', 
                         }
                     })
                     .then(function(response) {
-                        console.log("risposta dal server modifica attrazione ", response.data);
+                        $log.info("risposta dal server modifica attrazione ", response.data);
                         if (response.data.error === 0) {
                             Notification.success({
                                 message: 'Operation completed!',
@@ -743,7 +927,7 @@ app.controller("myModifyController", ['$scope','$log', '$http', 'Notification', 
                         }
                     })
                     .then(function(response) {
-                        console.log("*** risposta dal server aggiunta museo ", response.data, "***");
+                        $log.info("*** risposta dal server aggiunta museo ", response.data, "***");
                         if (response.data.error === 0) {
                             Notification.success({
                                 message: 'Operation completed!',
@@ -764,11 +948,11 @@ app.controller("myModifyController", ['$scope','$log', '$http', 'Notification', 
     };
 
     $scope.modifyArea = function(structure) {
-        console.log("sono modify area,struttura selezionata ", structure);
+        $log.info("sono modify area,struttura selezionata ", structure);
 
         switch (structure) {
             case 'Museum':
-                console.log("sono in modifyArea ");
+                $log.info("sono in modifyArea ");
                 toSend = {
                     city: $scope.museumSel.selected.city,
                     museumId: $scope.museumSel.selected.museumId,
@@ -788,7 +972,7 @@ app.controller("myModifyController", ['$scope','$log', '$http', 'Notification', 
                         }
                     })
                     .then(function(response) {
-                        console.log("risposta dal server modifica area ", response.data);
+                        $log.info("risposta dal server modifica area ", response.data);
                         if (response.data.error === 0) {
                             Notification.success({
                                 message: 'Operation completed!',
@@ -825,7 +1009,7 @@ app.controller("myModifyController", ['$scope','$log', '$http', 'Notification', 
                         }
                     })
                     .then(function(response) {
-                        console.log("*** risposta dal server aggiunta museo ", response.data, "***");
+                        $log.info("*** risposta dal server aggiunta museo ", response.data, "***");
                         if (response.data.error === 0) {
                             Notification.success({
                                 message: 'Operation completed!',
@@ -867,7 +1051,7 @@ app.controller("myModifyController", ['$scope','$log', '$http', 'Notification', 
                         }
                     })
                     .then(function(response) {
-                        $log.log("risposta dal server modifica area ", response.data);
+                        $log.info("risposta dal server modifica area ", response.data);
                         if (response.data.error === 0) {
                             Notification.success({
                                 message: 'Operation completed!',
@@ -903,7 +1087,7 @@ app.controller("myModifyController", ['$scope','$log', '$http', 'Notification', 
                         }
                     })
                     .then(function(response) {
-                        console.log("*** risposta dal server aggiunta museo ", response.data, "***");
+                        $log.info("*** risposta dal server aggiunta museo ", response.data, "***");
                         if (response.data.error === 0) {
                             Notification.success({
                                 message: 'Operation completed!',
@@ -941,7 +1125,7 @@ app.controller("myModifyController", ['$scope','$log', '$http', 'Notification', 
                         }
                     })
                     .then(function(response) {
-                        // console.log("  result ",response.data.result);
+                        // $log.info("  result ",response.data.result);
                         if (response.data.result === '1') {
                             Notification.success({
                                 message: 'Operation completed!',
@@ -977,7 +1161,7 @@ app.controller("myModifyController", ['$scope','$log', '$http', 'Notification', 
                         }
                     })
                     .then(function(response) {
-                        /// console.log(" parsing ",response.data);
+                        /// $log.info(" parsing ",response.data);
                         if (response.data.result === '1') {
                             Notification.success({
                                 message: 'Operation completed!',

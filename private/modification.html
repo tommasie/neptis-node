@@ -1,26 +1,45 @@
 <!DOCTYPE html>
-<html ng-app="myModification">
+<html ng-app="editApp">
 
 <head>
     <title>Modify content</title>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <script src="/js/jquery.js"></script>
-    <script src="/js/angular.js"></script>
-    <script src="/js/angular-sanitize.js"></script>
-    <script src="/angular/controller/myModifyController.js"></script>
-    <link rel="stylesheet" href="/css/bootstrap.css">
-    <script src="/js/bootstrap.js"></script>
-    <script src="/js/angular-ui-notification.js"></script>
-    <script src="/js/select.js"></script>
-    <link href="/css/select.css" rel="stylesheet" type="text/css">
-    <script src="preferences.js"></script>
-    <link href="/private.css" rel="stylesheet" type="text/css">
-    <style>
-        body {
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <!-- <script type="text/javascript"
+            src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD0xbJJwC7pQBzNFupb2s7orzOvB_ctSb4&libraries=geometry">
+            </script> -->
+        <!-- <script type="text/javascript"
+            src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD0xbJJwC7pQBzNFupb2s7orzOvB_ctSb4&libraries=geometry">
+            </script> -->
+        <script src="/js/jquery.js"></script>
+        <script src="/js/angular.js"></script> 
+        <script src="/js/angular-sanitize.js"></script>
+        <!-- <script src="/js/bundle.js"></script> -->
+        <link rel="stylesheet" href="/css/leaflet.css" />
+        <script src="/js/leaflet-src.js"></script>
+        <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-plugins/2.0.0/layer/tile/Google.min.js"></script> -->
+        <script src="/js/angular-simple-logger.js"></script>
+        <script src="/js/ui-leaflet.js"></script>
+        <script src="/js/ui-leaflet-layers.min.js"></script>
+        <script src="/js/ui-leaflet-draw.js"></script>
+        <script src="/angular/controller/modificationController.js"></script>
+        <script src="/js/ui-bootstrap-tpls.js"></script>
+        <link rel="stylesheet" href="/css/bootstrap.css">
+        <script src="/js/angular-ui-notification.js"></script>
+        <script src="preferences.js"></script>
+        <link href="/private.css" rel="stylesheet" type="text/css">
+        <script src="/js/select.js"></script>
+        <link href="/css/select.css" rel="stylesheet" type="text/css">
+        <style>
+            body {
             padding: 15px;
-        }
-    </style>
+            }
+            .center-block {
+                margin-left:auto;
+                margin-right:auto;
+                display:block;
+            }
+        </style>
 </head>
 
 <body>
@@ -39,177 +58,190 @@
     </nav>
     <div class="container">
         <form id="modify" name="modify">
-            <div ng-controller="myModifyController" class="container">
-                <div id='selectStructure' style='width:50%;margin-top: 60px'>
-                    <label for='structure'>Type of structure to modify</label>
-                    <ui-select ng-model="structure.selected" ng-change="change()" theme="bootstrap" ng-disabled="disabled" reset-search-input="false" style="width: 300px;">
-                        <ui-select-match placeholder="Select a structure...">{{$select.selected.name}}</ui-select-match>
-                        <ui-select-choices repeat="struct in structure | filter: $select.search" refresh-delay="0">
-                            <div ng-bind-html="struct.name | highlight: $select.search"></div>
-                        </ui-select-choices>
-                    </ui-select>
-                    <tt> Strutture scelta {{structure.selected}} </tt>
-                </div>
-
-                <div id='selectCity' style='width:50%;margin-top: 60px' ng-show="structure.selected.name == 'City'" class="input-group">
-                    <label for='existingCity'>Select a city</label>
-                    <!--  <select name="existingMuseum" id='existingMuseum' ng-model="museum" ng-change="changeMuseum(museum.museumId)" ng-options="m.museumName group by m.region for m in museumJSON">
-            </select> !-->
-                    <ui-select ng-model="citySel.selected" ng-change="showAttraction(citySel.selected.cityId)" theme="bootstrap" ng-disabled="disabled" reset-search-input="false" style="width: 300px;">
-                        <ui-select-match placeholder="Select a city...">{{$select.selected.cityName}}</ui-select-match>
-                        <ui-select-choices group-by="'region' " repeat="city in cityJSON | filter: $select.search" refresh-delay="0">
-                            <div ng-bind-html="city.cityName | highlight: $select.search"></div>
-                        </ui-select-choices>
-                    </ui-select>
-                </div>
-
-
-                <div id='selectMuseum' style='width:50%;margin-top: 60px' ng-show="(structure.selected.name == 'Museum' || structure.selected.name == 'Opened Museum')" class="input-group">
-                    <label for='existingMuseum'>Select a museum</label>
-                    <ui-select ng-model="museumSel.selected" ng-change="changeMuseum(museumSel.selected.museumId)" theme="bootstrap" ng-disabled="disabled" reset-search-input="false" style="width: 300px;">
-                        <ui-select-match placeholder="Select a museum...">{{$select.selected.museumName}} </ui-select-match>
-                        <ui-select-choices group-by="'region'" repeat="museum in museumJSON | filter: $select.search" refresh-delay="0">
-                            <div ng-bind-html="museum.museumName | highlight: $select.search"></div>
-                        </ui-select-choices>
-                    </ui-select>
-
-                    <input type='button' value='Modify museum name' class="btn btn-warning" style="margin-left:5px" data-toggle="modal" data-target="#modifyMuseum" ng-disabled="!museumSel.selected">
-                </div>
-
-
-                <div id='selectArea' style='width:50%;margin-top: 60px' ng-show="(structure.selected.name === 'Museum' || structure.selected.name === 'Opened Museum')" class="input-group">
-                    <label for='existingArea'>Select an area</label>
-                    <ui-select ng-model="areaMSel.selected" ng-change="changeArea(areaMSel.selected.areaId)" theme="bootstrap" ng-disabled="disabled" reset-search-input="false" style="width: 300px;">
-                        <ui-select-match placeholder="Select an area...">{{$select.selected.areaName}} <button type="button" style="position:absolute;margin-left: 20px" class="close" ng-click="clearArea($event)">&times;</button></ui-select-match>
-                        <ui-select-choices repeat="areaMSel in areaMJSON | filter: $select.search" refresh-delay="0">
-                            <div ng-bind-html="areaMSel.areaName | highlight: $select.search"></div>
-                        </ui-select-choices>
-                    </ui-select>
-                    <input type='button' value='Modify area name' class="btn btn-warning" style="margin-left: 5px" data-toggle="modal" data-target="#modifyArea" ng-disabled="!areaMSel.selected">
-                    <input type='button' value='Add new area' class="btn btn-success" style="margin-left: 5px" data-toggle="modal" data-target="#newArea" ng-disabled="checkDisabledNewAreaButton()">
-                </div>
-
-                <div id='selectAttraction' style='width:50%;margin-top: 60px' ng-show="(structure.selected.name === 'Museum' || structure.selected.name === 'City' || structure.selected.name === 'Opened Museum')" class="input-group">
-                    <label for='existingAttr'>Select an attraction</label>
-                    <!--    <select name="existingAttr" id='existingAttr' ng-model="attraction" ng-options="a.attractionName for a in attractionJSON">
-
-            </select> !-->
-                    <ui-select ng-model="attractionSel.selected" theme="bootstrap" ng-disabled="disabled" reset-search-input="false" style="width: 300px;">
-                        <ui-select-match placeholder="Select an attraction...">{{$select.selected.attractionName}} <button type="button" style="position:absolute;margin-left:20px" class="close" ng-click="clearAttr($event)">&times;</button></ui-select-match>
-                        <ui-select-choices repeat="attraction in attractionJSON | filter: $select.search" refresh-delay="0">
-                            <div ng-bind-html="attraction.attractionName | highlight: $select.search"></div>
-                        </ui-select-choices>
-                    </ui-select>
-
-                    <input type='button' value='disable' class="btn btn-danger" style="margin-left: 5px" ng-disabled="!attractionSel.selected" ng-click="disable(attractionSel.selected)">
-                    <input type='button' value='modify' class="btn btn-warning" style="margin-left: 5px" data-toggle="modal" data-target="#modifyAttr" ng-disabled="!attractionSel.selected">
-                    <input type='button' value='new' class="btn btn-success" style="margin-left: 5px" data-toggle="modal" data-target="#newAttr" ng-disabled="checkDisabledNewAttrButton()">
-
-                </div>
-
-                <!-- Modal for modifying attraction-->
-                <div id="modifyAttr" class="modal fade" role="dialog">
-                    <div class="modal-dialog">
-                        <!-- Modal content-->
-                        <div class="modal-content">
-                            <div class="modal-header">
-                                <button type="button" class="close" data-dismiss="modal">&times;</button>
-                                <h4 class="modal-title">Type the new name for the attraction</h4>
-                            </div>
-                            <div class="modal-body">
-                                <input id='attrModified' class='form-control' name='attrModified' ng-model="attrModified" type="text" placeholder="Insert new attraction name">
-                            </div>
-                            <div class="modal-footer">
-                                <input type='button' value='confirm' class="btn btn-success" ng-click="modifyAttraction(structure.selected.name)">
-                                <!-- <button type="button" class="btn btn-default" data-dismiss="modal">Close</button> !-->
-                            </div>
+            <div ng-controller="curatorEditController" class="container">
+                <div style="text-align:center; margin-bottom: 30px">
+                        <h3>Select the kind of structure and the city of interest</h3>
+                    </div>
+                    <div class="row">
+                        <!-- Structure -->
+                        <div class="col-md-4">
+                            <ui-select ng-model="structure.selected" theme="bootstrap" ng-disabled="disabled" reset-search-input="false" style="width: 300px;">
+                                <ui-select-match placeholder="Select a structure...">{{$select.selected.name}}</ui-select-match>
+                                <ui-select-choices repeat="struct in structure.structures | filter: $select.search" refresh-delay="0">
+                                    <div ng-bind-html="struct.name | highlight: $select.search"></div>
+                                </ui-select-choices>
+                            </ui-select>
+                        </div>
+                        <!-- Region -->
+                        <div class="col-md-4">
+                            <ui-select ng-model="regions.selected" ng-change="importCity(regions.selected.name)" theme="bootstrap" ng-disabled="disabled" reset-search-input="false" style="width: 300px;">
+                                <ui-select-match placeholder="Select a region...">{{$select.selected.name}}</ui-select-match>
+                                <ui-select-choices repeat="regione in region | filter: $select.search" refresh-delay="0">
+                                    <div ng-bind-html="regione.name | highlight: $select.search"></div>
+                                </ui-select-choices>
+                            </ui-select>
+                        </div>
+                        <!-- City -->
+                        <div class="col-md-4">
+                            <ui-select ng-model="comune.selected" theme="bootstrap" ng-disabled="disabled" reset-search-input="false" style="width: 300px;" on-select="onSelected($item)">
+                                <ui-select-match placeholder="Enter a city...">{{$select.selected.name}}</ui-select-match>
+                                <ui-select-choices repeat="comune in comuni | filter: $select.search" refresh-delay="0">
+                                    <div ng-bind-html="comune.name | highlight: $select.search"></div>
+                                </ui-select-choices>
+                            </ui-select>
                         </div>
                     </div>
-                </div>
 
-                <!-- Modal for adding new attraction-->
-                <div id="newAttr" class="modal fade" role="dialog">
-                    <div class="modal-dialog">
-                        <!-- Modal content-->
-                        <div class="modal-content">
-                            <div class="modal-header">
-                                <button type="button" class="close" data-dismiss="modal">&times;</button>
-                                <h4 class="modal-title">Type the name of the new attraction</h4>
+
+                <div ng-show="structure.selected.name=='City'">
+                        <div style="text-align:center; margin-bottom: 30px">
+                            <h3>Insert the attraction's name and coordinates</h3>
+                        </div>
+                        <label for='attractionName' style="display:inline;margin-left:-15px"> Attraction name </label>
+                        <input id='attractionName' style="margin-left:-15px" class='form-control' name='attractionName' ng-model="attractionName" type="text" placeholder="Insert a new attraction" required>
+                        <div id="map" style='margin-top: 30px'>
+                            <label style="display:inline;margin-left:-15px"> Attraction location </label>
+                            <leaflet height='500px' width='100%' lf-center='center' event-broadcast='events' markers='markers' lf-draw="map.drawOptions"></leaflet>
+                        </div>
+                        <input type='button' class="btn btn-default" id='submit' value='Add attraction' ng-click="addCityAttraction()" style='margin-top:20px;margin-left:auto;margin-right:auto;display:block;'>
+                        <div id="cityTable" style='margin-top:30px;'>
+                                        <table class="table table-hover table-sm table-bordered">
+                                            <thead>
+                                                <th>Attraction name</th>
+                                                <th>Latitude</th>
+                                                <th>Longitude</th>
+                                            </thead>
+                                            <tbody>
+                                                <tr ng-repeat="attraction in cityAttractions">
+                                                    <td>{{ attraction.name }}</td>
+                                                    <td>{{ attraction.latitude }}</td>
+                                                    <td>{{ attraction.longitude }}</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                    </div>
+                    <div ng-show="structure.selected.name=='Museum'">
+                        <div id='museumForm' style='margin-top: 30px'>
+                            <div style="text-align:center; margin-bottom: 30px">
+                                <h3>Insert the museum's name</h3>
                             </div>
-                            <div class="modal-body">
-                                <input id='newAttr' class='form-control' name='newAttr' ng-model="newAttr" type="text" placeholder="Insert new attraction name">
+                            <label for='museumName' style="display:inline;margin-left:-15px"> Museum name </label>
+                            <input id='museumName' style="margin-left:-15px" class='form-control' name='museumName' ng-model="museumName" type="text" placeholder="Insert a museum">
+                        </div>
+                        <div id='noAreaDiv'>
+                            <label style='display:inline-block;margin-left: -15px'>This museum has no areas</label>
+                            <input type='checkbox' style='display:inline-block;margin-left: 15px' ng-model="noArea" ng-show="structure.selected.name =='Museum'" name='noArea' value='noArea'>
+                        </div>
+
+                        <div style="text-align:center; margin-bottom: 30px">
+                            <h3>Add the rooms and attractions</h3>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div id='addArea' style='margin-top: 30px'>
+                                    <label for='areaName' style="display:inline;margin-left:-15px"> Area name </label>
+                                    <input id='areaName' style="margin-left:-15px" class='form-control' name='areaName' ng-model="areaName" type="text" placeholder="Insert a new area">
+                                    <input type='button' class="btn btn-default" id='submit' value='Add room' ng-click="addRoom()" style="margin-top:20px;margin-left:auto;margin-right:auto;display:block;">
+                                    <div id="areaTable">
+                                        <table class="table table-hover table-sm">
+                                            <thead>
+                                                <th>Room</th>
+                                            </thead>
+                                            <tbody>
+                                                <tr ng-repeat="area in roomsList" ng-click="selectArea(area)">
+                                                    <td ng-class="{'btn-info': area.selected}">{{ area.name }}</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
                             </div>
-                            <div class="modal-footer">
-                                <input type='button' value='confirm' class="btn btn-success" ng-click="addNewAttraction(structure.selected.name)">
-                                <!-- <button type="button" class="btn btn-default" data-dismiss="modal">Close</button> !-->
+                            <div class="col-md-4">
+                                <div id='addAttraction' style='margin-top: 30px'>
+                                    <label for='attractionName' style="display:inline;margin-left:-15px"> Attraction name </label>
+                                    <input id='attractionName' style="margin-left:-15px" class='form-control' name='attractionName' ng-model="attractionName" type="text" placeholder="Insert a new attraction" required>
+                                    <input type='button' class="btn btn-default" id='submit' value='Add attraction' ng-click="addAttraction()" style='margin-top:20px;margin-left:auto;margin-right:auto;display:block;'>
+                                    <div id="attractionsTable">
+                                        <table class="table table-hover table-sm">
+                                            <thead>
+                                                <th>Attraction for room {{selectedArea.name}}</th>
+                                            </thead>
+                                            <tbody>
+                                                <tr ng-repeat="attraction in attractionsList">
+                                                    <td>{{ attraction.name }}</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-md-4">
+                                <div id='addAdjRoom' style='margin-top: 30px'>
+                                    <label style="display:inline;margin-left:-15px">Set Adjacent Rooms</label>
+                                    <ui-select ng-model="selectedAdjArea.selected" theme="bootstrap" ng-disabled="disabled" reset-search-input="false" ng-show="structure.selected.name=='Museum'">
+                                        <ui-select-match placeholder="Select a structure...">{{$select.selected.name}}</ui-select-match>
+                                        <ui-select-choices repeat="room in roomsList | filter: filterRooms" refresh-delay="0">
+                                            <div ng-bind-html="room.name | highlight: $select.search"></div>
+                                        </ui-select-choices>
+                                    </ui-select>
+                                    <input type='button' class="btn btn-default" id='submit' value='Add adjacent room' ng-click="addAdjRoom()" style='margin-top:20px;margin-left:auto;margin-right:auto;display:block;'>
+                                    <div id="adjacentTable">
+                                        <table class="table table-hover table-sm">
+                                            <thead>
+                                                <th>Adjacency list for room {{selectedArea.name}}</th>
+                                            </thead>
+                                            <tbody>
+                                                <tr ng-repeat="area in selectedArea.adjacent">
+                                                    <td>{{ area }}</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                </div>
-
-                <!-- Modal for modifying area-->
-                <div id="modifyArea" class="modal fade" role="dialog">
-                    <div class="modal-dialog">
-                        <!-- Modal content-->
-                        <div class="modal-content">
-                            <div class="modal-header">
-                                <button type="button" class="close" data-dismiss="modal">&times;</button>
-                                <h4 class="modal-title">Type the new name for the area</h4>
+                        <div class="row">
+                            <div class="col-md-4 col-md-offset-2">
+                                <div id='startRoom' style='margin-top: 30px'>
+                                    <label style="display:inline;margin-left:-15px">Set Adjacent Rooms</label>
+                                    <ui-select ng-model="startEndRooms.start" theme="bootstrap" ng-disabled="disabled" reset-search-input="false" ng-show="structure.selected.name=='Museum'">
+                                        <ui-select-match placeholder="Select a structure...">{{$select.selected.name}}</ui-select-match>
+                                        <ui-select-choices repeat="room in roomsList | filter: $select.search" refresh-delay="0">
+                                            <div ng-bind-html="room.name | highlight: $select.search"></div>
+                                        </ui-select-choices>
+                                    </ui-select>
+                                </div>
                             </div>
-                            <div class="modal-body">
-                                <input id='areaModified' class='form-control' name='areaModified' ng-model="areaModified" type="text" placeholder="Insert new area name">
+                            <div class="col-md-4">
+                                <div id='endRoom' style='margin-top: 30px'>
+                                    <label style="display:inline;margin-left:-15px">Set Adjacent Rooms</label>
+                                    <ui-select ng-model="startEndRooms.end" theme="bootstrap" ng-disabled="disabled" reset-search-input="false" ng-show="structure.selected.name=='Museum'">
+                                        <ui-select-match placeholder="Select a structure...">{{$select.selected.name}}</ui-select-match>
+                                        <ui-select-choices repeat="room in roomsList | filter: $select.search" refresh-delay="0">
+                                            <div ng-bind-html="room.name | highlight: $select.search"></div>
+                                        </ui-select-choices>
+                                    </ui-select>
+                                </div>
                             </div>
-                            <div class="modal-footer">
-                                <input type='button' value='confirm' class="btn btn-success" ng-click="modifyArea(structure)">
-                                <!-- <button type="button" class="btn btn-default" data-dismiss="modal">Close</button> !-->
-                            </div>
+                        </div>    
+                        <div id='addMuseum' style='margin-top: 30px;'>
+                            <input type='button' class="btn btn-default" id='submit' value='Add museum' ng-click="addMuseum()" style='margin-left:auto;margin-right:auto;display:block;'>
                         </div>
-                    </div>
-                </div>
 
-                <!-- Modal for adding new area-->
-                <div id="newArea" class="modal fade" role="dialog">
-                    <div class="modal-dialog">
-                        <!-- Modal content-->
-                        <div class="modal-content">
-                            <div class="modal-header">
-                                <button type="button" class="close" data-dismiss="modal">&times;</button>
-                                <h4 class="modal-title">Type the name of the new area</h4>
-                            </div>
-                            <div class="modal-body">
-                                <input id='newArea' class='form-control' name='newArea' ng-model="newArea" type="text" placeholder="Insert new area name">
-                            </div>
-                            <div class="modal-footer">
-                                <input type='button' value='confirm' class="btn btn-success" ng-click="addNewArea(structure.selected.name)">
-                                <!-- <button type="button" class="btn btn-default" data-dismiss="modal">Close</button> !-->
-                            </div>
+                        <!-- <input type='button' class="btn btn-default" id='submit' value='Add links' ng-click="parser2(structure.selected.name)" style='margin-left: 300px'>
+
+                         <div id='add' style='margin-top: 30px' ng-show="(structure.selected.name=='Museum' || structure.selected.name == 'City')">
+                            <input type='button' class="btn btn-default" id='submit' value='Add new instance' ng-click="add2(structure.selected.name)" style='margin-left:auto;margin-right:auto;display:block;' ng-disabled="create.$invalid">
                         </div>
+                        <div id='confirmation' style='margin-top: 30px' ng-show="(structure.selected.name=='Museum' || structure.selected.name == 'City')">
+                            <input type='button' class="btn btn-default" id='submit' value='End instances' ng-click="add(structure.selected.name)" style='margin-left:auto;margin-right:auto;display:block;'>
+                        </div>  -->
                     </div>
-                </div>
-
-                <!-- Modal for modifying a museum-->
-                <div id="modifyMuseum" class="modal fade" role="dialog">
-                    <div class="modal-dialog">
-                        <!-- Modal content-->
-                        <div class="modal-content">
-                            <div class="modal-header">
-                                <button type="button" class="close" data-dismiss="modal">&times;</button>
-                                <h4 class="modal-title">Type the new name for the museum</h4>
-                            </div>
-                            <div class="modal-body">
-                                <input id='museumModified' class='form-control' name='museumModified' ng-model="museumModified" type="text" placeholder="Insert new museum name">
-                            </div>
-                            <div class="modal-footer">
-                                <input type='button' value='confirm' class="btn btn-success" ng-click="modifyMuseum(structure.selected.name)">
-                                <!-- <button type="button" class="btn btn-default" data-dismiss="modal">Close</button> !-->
-                            </div>
-                        </div>
+                    <div id='finish2' ng-show="(structure.selected.name=='City' || structure.selected.name=='Museum')" style='margin-top: 30px;'>
+                        <input type='button' class="btn btn-default" id='submit' value='Finish' ng-click="finish()" style='margin-left:auto;margin-right:auto;display:block;'>
                     </div>
-                </div>
-
-                <div id='finish' style='margin-top: 30px'>
-                    <input type='button' class="btn btn-primary" id='submit' value='Finish' ng-click="parser(structure.selected.name)" style='margin-left: 300px'>
-                </div>
 
             </div>
         </form>

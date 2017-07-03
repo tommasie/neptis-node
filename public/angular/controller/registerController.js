@@ -1,12 +1,5 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
-
-   
-var app = angular.module('myApp1',['ngMessages','preferences']);
-app.controller('loginController',['$scope','$http','SharedPreferences',function($scope,$http,SharedPreferences){
+var app = angular.module('registerApp',['ngMessages','preferences']);
+app.controller('registerController',['$scope','$http','SharedPreferences',function($scope,$http,SharedPreferences){
     
     $scope.server = SharedPreferences.nodeServer;
     $scope.visible = false;

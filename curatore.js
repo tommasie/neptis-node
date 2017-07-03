@@ -1,11 +1,14 @@
 var request = require('request');
 var async = require('async');
+var fs = require('fs');
+var _ = require('lodash');
 var app = require('./common');
 var config = require('./public/resources/config.json');
 var logger = require('./logger');
-var serverName = config.serverName;
-var portNumber = config.portNumber;
+
 var serverUrl = config.serverUrl;
+var appName = config.webapp;
+var serverName = serverUrl  + appName;
 var serverNode = config.serverNode;
 
 var neo4j = require('neo4j');
@@ -37,13 +40,14 @@ app.post('/login_admin', function (req, res) {
     res.set("Access-Control-Allow-Credentials", true);
 
     request({
-        url: serverName + "entities.admin/" + uid,
+        url: serverName + "curator/" + uid,
         method: "GET",
         json: true,
         headers: [{
             'content-type': 'application/json'
         }]
     }, function (error, response, body) {
+        console.log(response.statusCode);
         if (!error & response.statusCode === 200) {
             if (upwd === body.password) {
                 logger.info(path, "authentication successful for user", uid);
@@ -84,7 +88,7 @@ app.post('/registration', function (req, res) {
     password = req.body.pwd;
 
     request({
-        url: serverName + "entities.admin/",
+        url: serverName + "curator/",
         method: "POST",
         json: {
             name: name,
@@ -113,29 +117,24 @@ app.get('/curatore', function (req, res) {
     if (sess.name)
         res.sendFile(__dirname + '/private/curatore.html');
     else
-        res.sendFile(__dirname + '/public/index.html');
+        res.status(440).redirect(serverNode);
 });
 
 app.get('/creation', function (req, res) {
     sess = req.session;
     if (sess.name) {
         res.sendFile(__dirname + '/private/creation.html');
-        return;
     } else {
-        res.sendFile(__dirname + '/public/index.html');
-        return;
+        res.status(440).redirect(serverNode);
     }
 });
 
 app.get('/modification', function (req, res) {
     sess = req.session;
-    if (sess.name) {
-        res.sendFile(__dirname + '/private/modification.html');
-        return;
-    } else {
-        res.sendFile(__dirname + '/public/index.html');
-        return;
-    }
+    if (sess.name)
+        res.status(200).sendFile(__dirname + '/private/modification.html');
+    else
+        res.status(440).redirect(serverNode);
 });
 
 /**
@@ -144,18 +143,19 @@ Add city
 app.post('/addCity', function (req, res) {
     var path = '[' + req.path + '] ';
     logger.info(path, req.method);
-    city = req.body.name;
-    region = req.body.region;
-    attractions = JSON.parse(req.body.attractions);
+    var city = req.body.name;
+    var region = req.body.region;
+    var attractions = JSON.parse(req.body.attractions);
     var id_city;
     request({
-        url: serverName + "entities.city/",
+        url: serverName + "city/",
         method: "POST",
         json: {
             name: city,
             region: region
         }
     }, function (error, response, body) {
+        logger.debug(response.statusCode);
         if (!error && response.statusCode === 201) {
             logger.info(path, response.statusCode, "City " + city + " added");
             var loc = response.headers.location;
@@ -165,7 +165,7 @@ app.post('/addCity', function (req, res) {
                 attractions[i].city = {id:id_city};
             }
             request({
-                url: serverName + "entities.attractionc/",
+                url: serverName + "attractionc/",
                 method: "POST",
                 json:attractions
             }, function (error, response, body) {
@@ -174,7 +174,7 @@ app.post('/addCity', function (req, res) {
                     res.sendStatus(200);
                     return;
                 } else {
-                    logger.error(path, response.statusCode, "The ttractions of city " + city + " could not be added");
+                    logger.error(path, response.statusCode, "The attractions of city " + city + " could not be added");
                     res.sendStatus(500);
                     return;
                 }
@@ -229,16 +229,29 @@ app.post('/addMuseum', function (req, res) {
     var path = '[' + req.path + '] ';
     logger.info(path, req.method);
     logger.info(path + "Museum name: ", req.body.museumName);
-    city = req.body.city;
-    region = req.body.region;
-    museumName = req.body.museumName;
-    attractions = JSON.parse(req.body.attractions);
+    var city = req.body.city;
+    var region = req.body.region;
+    var museumName = req.body.museumName;
+    var attractions = JSON.parse(req.body.attractions);
+    var startRoom = req.body.startRoom;
+    var endRoom = req.body.endRoom;
+    logger.debug("attractions:", JSON.stringify(attractions));
     var id_city;
     var id_museum;
     var id_area;
-
+    
+    _.forEach(attractions.adjacent, function(value) {
+        value = value.toLowerCase.replace(/ /g, '_');
+    });
+    var adj = {};
+    for(var i = 0; i < attractions.length; i++) {
+        adj[attractions.name.toLowerCase.replace(/ /g, '_')] = attractions.adjacent;
+    }
+    adj.start = startRoom;
+    adj.end = endRoom;
+    
     request({
-        url: serverName + "entities.city/",
+        url: serverName + "city/",
         method: "POST",
         json: {
             name: city,
@@ -250,9 +263,9 @@ app.post('/addMuseum', function (req, res) {
             var loc = response.headers.location;
             var id = loc.match(regex);
             id_city = id[0];
-            logger.info(path, "City id:", id_city);
+            logger.debug(path, "City id:", id_city);
             request({
-                url: serverName + "entities.museum/",
+                url: serverName + "museum/",
                 method: "POST",
                 json: {
                     name: museumName,
@@ -266,8 +279,8 @@ app.post('/addMuseum', function (req, res) {
                     loc = response.headers.location;
                     id = loc.match(regex);
                     id_museum = id[0];
-                    logger.info(path, "Museum id:", id_museum);
-                    db.cypher({
+                    logger.debug(path, "Museum id:", id_museum);
+                    /*db.cypher({
                         query: "MERGE (:Museum {name:{name}, id:{id}, city:{city}, region:{region}})",
                         params: {
                             name: museumName,
@@ -279,29 +292,38 @@ app.post('/addMuseum', function (req, res) {
                         if (err)
                             logger.error(path, "Error on museum CREATE", err);
                         else logger.info(path, "Museum added to Neo4j", res);
-                    });
+                    });*/
+                
+                    //Manage the adjacencies on a local JSON file
+                    var adjPath = __dirname + "/adjacencies/" + city;
+                    if(!fs.existsSync(adjPath)) {
+                        fs.mkdirSync(adjPath);
+                    }
+                    fs.writeFileSync(adjPath + "/" + museumName, JSON.stringify(adj),'utf-8');
                     /* since Node is all asynchronous, a normal for cannot be used to
                      * iterate over the areas, since the area variable will immediately get to the last value
                      * in the object before the requests have been fully handled, therefore an async library
                      * was needed to reduce the number of calls to the DB */
-                    async.each(Object.keys(attractions), function (area, callback) {
+                    async.each(attractions, function (area, callback) {
                         request({
-                            url: serverName + "entities.aream/",
+                            url: serverName + "aream/",
                             method: "POST",
                             json: {
-                                name: attractions[area].name,
+                                name: area.name,
                                 museum: {
                                     id: id_museum
                                 }
                             }
                         }, function (error, response, body) {
                             if (!error && response.statusCode === 201) {
-                                logger.info(path, response.statusCode, "Area " + attractions[area].name + " added");
+                                
+                                logger.info(path, response.statusCode, "Area " + area.name + " added");
                                 loc = response.headers.location;
                                 id = loc.match(regex);
                                 id_area = id[0];
                                 logger.info(path, "Area id:", id_area);
-                                db.cypher({
+                                
+                                /*db.cypher({
                                     query: "MERGE (:Area {name:{name}, id:{id}})",
                                     params: {
                                         name: attractions[area].name,
@@ -311,27 +333,27 @@ app.post('/addMuseum', function (req, res) {
                                     if (err)
                                         logger.error(path, "Error on area CREATE", err);
                                     else logger.info(path, "Area " + attractions[area].name + " added to Neo4j", res);
-                                });
-                                for (var i = 0; i < attractions[area].attractions.length; i++) {
-                                    var attraction = attractions[area].attractions[i];
-                                    attraction.areaM = {};
-                                    attraction.areaM.id = id_area;
+                                });*/
+                                for (var i = 0; i < area.attractions.length; i++) {
+                                    var attraction = area.attractions[i];
+                                    attraction.areaM = {id: id_area};
                                 }
+                                logger.debug(JSON.stringify(area.attractions));
                                 request({
-                                    url: serverName + "entities.attractionm/",
+                                    url: serverName + "attractionm/",
                                     method: "POST",
-                                    json: attractions[area].attractions
+                                    json: area.attractions
                                 }, function (error, response, body) {
                                     if (!error && response.statusCode === 201) {
-                                        logger.info(path, response.statusCode, "Attractions of area " + attractions[area].name + " added");
+                                        logger.info(path, response.statusCode, "Attractions of area " + area.name + " added");
                                     } else if (response.statusCode === 500) {
-                                        logger.error(path, response.statusCode, "Error in adding attractions of area " + attractions[area].name);
+                                        logger.error(path, response.statusCode, "Error in adding attractions of area " + area.name);
                                     } else logger.error(response.statusCode);
                                     //Needed to signal the end of a single iteration of async.each()
                                     callback();
                                 });
 
-                            } else logger.error(path, response.statusCode, "Error while adding area " + attractions[area].name);
+                            } else logger.error(path, response.statusCode, "Error while adding area " + area.name);
                         });
                         // Callback function for async.each(), called one it has finished the iteration
                     }, function (err) {
@@ -357,139 +379,6 @@ app.post('/addMuseum', function (req, res) {
         }
     });
 });
-/*
-app.post('/addMuseum', function(req, res) {
-    logger.info("addMuseumRoute museum name: ", req.body.museumName);
-    city = req.body.city;
-    region = req.body.region;
-    museumName = req.body.museumName;
-    area = req.body.area;
-    attraction = req.body.attraction;
-    var id_area = "";
-    var id_museum = "";
-    var id_city = "";
-
-    request({
-        url: serverName + "entities.city/",
-        method: "POST",
-        json: {
-            name: city,
-            region: region
-        }
-    }, function(error, response, body) {
-        if (!error && (response.statusCode == 204 || response.statusCode == 500)) {
-            logger.info("***CITY added correctly ***");
-            request({
-                url: serverName + "entities.city/" + city + "," + region,
-                method: "GET",
-                json: true,
-                headers: [{
-                    'content-type': 'application/json'
-                }]
-            }, function(error, response, body) {
-                if (!error & response.statusCode === 200) {
-                    logger.info('*** Operation GET CITY ID succeded,id: ', body[0].id, '***');
-                    id_city = body[0].id;
-                    request({
-                        url: serverName + "entities.museum/",
-                        method: "POST",
-                        json: {
-                            name: museumName,
-                            city: {
-                                id: id_city
-                            }
-                        }
-                    }, function(error, response, body) {
-                        // we need the museum id since it is fk in attraction_M table
-                        if (!error & (response.statusCode === 204 || response.statusCode === 500)) {
-                            logger.info("*** Museum added correctly ***");
-                            request({
-                                url: serverName + "entities.museum/" + museumName + "," + id_city,
-                                method: "GET",
-                                json: true,
-                                headers: [{
-                                    'content-type': 'application/json'
-                                }]
-                            }, function(error, response, body) {
-                                if (!error & response.statusCode === 200) {
-                                    logger.info("*** Operation GET MUSEUM ID succeded,id: ", body[0].id, " ***");
-                                    id_museum = body[0].id;
-                                    request({
-                                        url: serverName + "entities.aream/",
-                                        method: "POST",
-                                        json: {
-                                            name: area,
-                                            museum: {
-                                                id: id_museum
-                                            }
-                                        }
-                                    }, function(error, response, body) {
-                                        if (!error & (response.statusCode === 204 || response.statusCode === 500)) {
-                                            logger.info("*** AREA added correctly ***");
-                                            request({
-                                                url: serverName + "entities.aream/" + area + "," + id_museum,
-                                                method: "GET",
-                                                json: true,
-                                                headers: [{
-                                                    'content-type': 'application/json'
-                                                }]
-                                            }, function(error, response, body) {
-                                                if (!error & response.statusCode === 200) {
-                                                    logger.info("*** Operation GET AREA ID succeded,id: ", body[0].id, " ***");
-                                                    id_area = body[0].id;
-                                                    request({
-                                                        url: serverName + "entities.attractionm/",
-                                                        method: "POST",
-                                                        json: {
-                                                            name: attraction,
-                                                            areaM: {
-                                                                id: id_area
-                                                            }
-                                                        }
-                                                    }, function(error, response, body) {
-                                                        if (!error & response.statusCode === 204) {
-                                                            logger.info("*** ATTRACTION added correctly ***");
-                                                            //res.send("Operation complete!");
-                                                            res.send({
-                                                                error: 0
-                                                            });
-                                                        } else if (response.statusCode === 500) {
-                                                            logger.info("!-- ERROR in adding attraction --!");
-                                                        }
-                                                    });
-                                                } else if (response.statusCode === 500)
-                                                    logger.info("!-- ERROR in getting area id --!");
-                                            });
-                                        } else logger.info("!-- ERROR in adding Area Museum");
-                                    });
-                                } else if (response.statusCode === 500)
-                                    logger.info("!-- ERROR in getting museum id");
-                            });
-                            //res.send('Operation Succeded');
-                            return;
-                        } else {
-                            logger.info("!-- ERROR in adding museum  --! code: ", response.statusCode);
-                            //res.send("Operation failed");
-                            return;
-                        }
-                    });
-                    return;
-                } else {
-                    logger.info("!-- ERROR in getting city id --! code: ", response.statusCode);
-                    //res.send("Operation failed");
-                    return;
-                }
-            });
-            return;
-        } else if (response.statusCode === 400) {
-            logger.info("!-- ERROR in adding city --! code: ", response.statusCode);
-            res.send({
-                error: 1
-            });
-            return;
-        }
-    });
-});*/
 
 /**
 Add OAM
@@ -505,7 +394,7 @@ app.post('/addOpenedMuseum', function (req, res) {
     var id_museum;
     var id_city;
     request({
-        url: serverName + "entities.city/",
+        url: serverName + "city/",
         method: "POST",
         json: {
             name: city,
@@ -518,7 +407,7 @@ app.post('/addOpenedMuseum', function (req, res) {
             var id = loc.match(regex);
             id_city = id[0];
             request({
-                url: serverName + "entities.oam/",
+                url: serverName + "oam/",
                 method: "POST",
                 json: {
                     name: museumName,
@@ -536,7 +425,7 @@ app.post('/addOpenedMuseum', function (req, res) {
                     //TODO fix for OAM
                     async.each(Object.keys(attractions), function (area, callback) {
                         request({
-                            url: serverName + "entities.aream/",
+                            url: serverName + "aream/",
                             method: "POST",
                             json: {
                                 name: attractions[area].name,
@@ -567,7 +456,7 @@ app.post('/addOpenedMuseum', function (req, res) {
                                     attraction.areaOam = {id:id_area};
                                 }
                                 request({
-                                    url: serverName + "entities.attractionm/",
+                                    url: serverName + "attractionm/",
                                     method: "POST",
                                     json: attractions[area].attractions
                                 }, function (error, response, body) {
@@ -616,7 +505,7 @@ app.post('/addNewArea', function (req, res) {
 
     if (category === 'Museum') {
         request({
-            url: serverName + "entities.aream/",
+            url: serverName + "aream/",
             method: "POST",
             json: {
                 name: areaName,
@@ -640,7 +529,7 @@ app.post('/addNewArea', function (req, res) {
         });
     } else if (category === 'Opened Museum') {
         request({
-            url: serverName + "entities.areaoam/",
+            url: serverName + "areaoam/",
             method: "POST",
             json: {
                 name: areaName,
@@ -679,7 +568,7 @@ app.post('/modifyArea', function (req, res) {
 
     if (structure === 'Museum') {
         request({
-            url: serverName + "entities.aream/" + id_area,
+            url: serverName + "aream/" + id_area,
             method: "PUT",
             json: {
                 museum: {
@@ -708,7 +597,7 @@ app.post('/modifyArea', function (req, res) {
     }
     if (structure === 'Opened Museum') {
         request({
-            url: serverName + "entities.areaoam/" + id_area,
+            url: serverName + "areaoam/" + id_area,
             method: "PUT",
             json: {
                 oam: {
@@ -747,7 +636,7 @@ app.post('/modifyMuseum', function (req, res) {
 
     if (structure === 'Museum') {
         request({
-            url: serverName + "entities.museum/" + id_museum,
+            url: serverName + "museum/" + id_museum,
             method: "PUT",
             json: {
                 city: {
@@ -776,7 +665,7 @@ app.post('/modifyMuseum', function (req, res) {
     }
     if (structure === 'Opened Museum') {
         request({
-            url: serverName + "entities.oam/" + id_museum,
+            url: serverName + "oam/" + id_museum,
             method: "PUT",
             json: {
                 city: {
@@ -806,7 +695,8 @@ app.post('/modifyMuseum', function (req, res) {
 });
 
 app.post('/disableAttr', function (req, res) {
-    logger.info("*** route disable attraction ***");
+    path = '[' + req.path + '] ';
+    logger.info(path, req.method);
     structure = req.body.struct;
     id_attr = req.body.id_attr;
     name = req.body.name;
@@ -814,7 +704,7 @@ app.post('/disableAttr', function (req, res) {
     if (structure === 'City') {
         id_city = req.body.id_city;
         request({
-            url: serverName + "entities.attractionc/" + id_attr,
+            url: serverName + "attractionc/" + id_attr,
             method: "PUT",
             json: {
                 city: {
@@ -843,7 +733,7 @@ app.post('/disableAttr', function (req, res) {
     if (structure === 'Museum') {
         id_areaM = req.body.id_area;
         request({
-            url: serverName + "entities.attractionm/" + id_attr,
+            url: serverName + "attractionm/" + id_attr,
             method: "PUT",
             json: {
                 areaM: {
@@ -872,7 +762,7 @@ app.post('/disableAttr', function (req, res) {
     if (structure === 'Opened Museum') {
         id_areaOam = req.body.id_area;
         request({
-            url: serverName + "entities.attractionoam/" + id_attr,
+            url: serverName + "attractionoam/" + id_attr,
             method: "PUT",
             json: {
                 areaOam: {
@@ -887,13 +777,9 @@ app.post('/disableAttr', function (req, res) {
             }]
         }, function (error, response, body) {
             logger.info("Request statusCode: " + response.statusCode);
-            //logger.info("*** response ", response);
             if (!error & response.statusCode === 204) {
                 logger.info("*** Update succeded *** ");
                 res.status(response.statusCode);
-                //res.send({ response : 'ok'})
-
-                return;
             }
 
         });
@@ -910,7 +796,7 @@ app.post('/modifyAttr', function (req, res) {
     if (structure === 'City') {
         id_city = req.body.cityId;
         request({
-            url: serverName + "entities.attractionc/" + id_attr,
+            url: serverName + "attractionc/" + id_attr,
             method: "PUT",
             json: {
                 city: {
@@ -945,7 +831,7 @@ app.post('/modifyAttr', function (req, res) {
     if (structure === 'Museum') {
         id_areaM = req.body.areaId;
         request({
-            url: serverName + "entities.attractionm/" + id_attr,
+            url: serverName + "attractionm/" + id_attr,
             method: "PUT",
             json: {
                 areaM: {
@@ -979,7 +865,7 @@ app.post('/modifyAttr', function (req, res) {
     if (structure === 'Opened Museum') {
         id_areaOam = req.body.areaId;
         request({
-            url: serverName + "entities.attractionoam/" + id_attr,
+            url: serverName + "attractionoam/" + id_attr,
             method: "PUT",
             json: {
                 areaOam: {
@@ -1013,58 +899,6 @@ app.post('/modifyAttr', function (req, res) {
     }
 });
 
-app.post('/check_captcha', function (req, res) {
-    logger.info("*** POST '/check_captcha'");
-    res.setHeader('Content-Type', 'application/json');
-    res.header("Access-Control-Allow-Origin", "*");
-    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
-    res.header("Access-Control-Allow-Credentials", true);
-
-    secret_key = '6Lflex4TAAAAAGtYE7LpdVVw5OID-b8NqfP-KZw6';
-    response = req.body.resp;
-    toSend = {
-        key: secret_key,
-        resp: response
-    };
-
-    logger.info("response : ", response);
-
-    request({
-        url: " https://www.google.com/recaptcha/api/siteverify?secret=" + secret_key + "&response=" + response,
-        method: "POST",
-        json: true,
-        headers: [{
-            'content-type': 'application/json'
-        }]
-    }, function (error, response, body) {
-        logger.info("Request statusCode: " + response.statusCode);
-        if (!error & response.statusCode === 200) {
-            logger.info("***  get response : ", body);
-            if (body.error_codes) {
-                logger.info("manca qualche input");
-                res.send({
-                    error: 1
-                });
-                return;
-            } else {
-                logger.info("parametri ok");
-                res.send({
-                    ok: 1
-                });
-                return;
-            }
-            //res.send({ error : '0'});
-            return;
-        } else {
-            //res.status(response.statusCode);
-            //res.send({error : 'reg_error'});
-            //res.send(body);
-            logger.info("/check_captcha failed!: ");
-            return;
-        }
-    });
-});
-
 app.post('/create-pddl', function (req, res) {
     logger.info("*** POST '/create-pddl': " + req.body.type);
     utype = req.body.type; // {city, museum, oam}
@@ -1080,7 +914,7 @@ app.post('/create-pddl', function (req, res) {
         region = req.body.region;
         uname = req.body.name;
         request({
-            url: serverName + "entities.city/" + city + "," + region,
+            url: serverName + "city/" + city + "," + region,
             method: "GET",
             json: true,
             headers: [{
@@ -1092,7 +926,7 @@ app.post('/create-pddl', function (req, res) {
                 id = body[0].id;
                 var unameLow = uname.toLowerCase().replace(/ /g, "_");
                 logger.info("id da variabile ", id);
-                myurl = serverName + "entities.attractionc/cityId=" + id;
+                myurl = serverName + "attractionc/cityId=" + id;
                 fileProblem = "/home/thomas/tesi/problems/city/" + unameLow + ".pddl";
                 /* pddl creation */
 
@@ -1167,7 +1001,7 @@ app.post('/create-pddl', function (req, res) {
         region = req.body.region;
         uname = req.body.museumName;
         request({
-            url: serverName + "entities.city/" + city + "," + region,
+            url: serverName + "city/" + city + "," + region,
             method: "GET",
             json: true,
             headers: [{
@@ -1178,7 +1012,7 @@ app.post('/create-pddl', function (req, res) {
                 logger.info("City id taken ", body[0].id);
                 id_city = body[0].id;
                 request({
-                    url: serverName + "entities.museum/" + museumName + "," + id_city,
+                    url: serverName + "museum/" + museumName + "," + id_city,
                     method: "GET",
                     json: true,
                     headers: [{
@@ -1193,7 +1027,7 @@ app.post('/create-pddl', function (req, res) {
                         var unameLow = uname.toLowerCase().replace(/ /g, "_");
                         id = body[0].id;
                         // qui va creazione pddl
-                        myurl = serverName + "entities.attractionm/museumId=" + id;
+                        myurl = serverName + "attractionm/museumId=" + id;
                         fileProblem = "/home/thomas/tesi/problems/museum/" + unameLow + ".pddl";
 
                         request({
@@ -1306,7 +1140,7 @@ app.post('/create-pddl', function (req, res) {
         region = req.body.region;
         uname = req.body.museumName;
         request({
-            url: serverName + "entities.city/" + city + "," + region,
+            url: serverName + "city/" + city + "," + region,
             method: "GET",
             json: true,
             headers: [{
@@ -1317,7 +1151,7 @@ app.post('/create-pddl', function (req, res) {
                 logger.info("City id taken ", body[0].id);
                 id_city = body[0].id;
                 request({
-                    url: serverName + "entities.oam/" + museumName + "," + id_city,
+                    url: serverName + "oam/" + museumName + "," + id_city,
                     method: "GET",
                     json: true,
                     headers: [{
@@ -1330,7 +1164,7 @@ app.post('/create-pddl', function (req, res) {
                         logger.info("-- stringa manipolata ", unameLow);
                         id = body[0].id;
                         // qui va creazione pddl
-                        myurl = serverName + "entities.attractionoam/oamId=" + id;
+                        myurl = serverName + "attractionoam/oamId=" + id;
                         fileProblem = "/home/thomas/tesi/problems/oam/" + unameLow + ".pddl";
 
                         request({

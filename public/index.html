@@ -7,22 +7,23 @@
         <script src="/js/jquery.js"></script>
         <script src="/js/angular.js"></script>
         <script src="/js/angular-animate.js"></script>
+        <script src="/js/angular-messages.js"></script>
         <script src="/js/ui-bootstrap-tpls.js"></script>
         <link rel="stylesheet" href="/bower/bootstrap/dist/css/bootstrap.min.css">
         <script src='https://www.google.com/recaptcha/api.js' async defer></script>
-        <script src="/angular/controller/myIndexController.js"></script>
+        <script src="/angular/controller/indexPageController.js"></script>
         <script src="preferences.js"></script>
-
-         <style>
+        
+        <style>
             body {
                 padding: 15px;
             }
-
+            
             .input-group-addon{
                 background-color: rgb(50, 118, 177);
                 border-color: rgb(40, 94, 142);
                 color: rgb(255, 255, 255);
-
+                
             }
             .form-control:focus{
                 background-color: rgb(50, 118, 177);
@@ -34,8 +35,8 @@
                 border: 1px solid rgb(50, 118, 177);
                 float:right;
             }
-
-             .navbar-default {
+            
+            .navbar-default {
                 background-color: #337ab7;
                 border-color: #E7E7E7;
             }
@@ -103,112 +104,80 @@
                     color: #333;
                 }
             }
-
-
+            
+            
         </style>
-
+        
     </head>
-    <body ng-app="myApp">
+    <body ng-app="indexPageApp">
         <div id = "titolo" align = "center" style="font-family:Arial; font-size:50px" > NEPTIS </div>
         <nav class="navbar navbar-default  navbar-static-top" style="top:-10px">
             <div class="container-fluid" >
-              <a class="navbar-brand" href="#">NEPTIS</a>
-              <ul class="nav navbar-nav">
-                <li class="active"><a href='index'>Home</a></li>
-                <li ><a href='project.html'> Project</a></li>
-                <li><a href='app.html'> App</a></li>
-                <li><a href='contactus.html'> Contact us</a></li>
-                <li><a href='registerForm.html'> Register as administrator</a></li>
-              </ul>
+                <a class="navbar-brand" href="#">NEPTIS</a>
+                <ul class="nav navbar-nav">
+                    <li class="active"><a href='index'>Home</a></li>
+                    <li ><a href='project.html'> Project</a></li>
+                    <li><a href='app.html'> App</a></li>
+                    <li><a href='contactus.html'> Contact us</a></li>
+                    <li><a href='registerForm.html'> Register as administrator</a></li>
+                </ul>
             </div>
         </nav>
-        <div style="float:left; width:50%; margin-top: 80px">
-        <p align="left" style='float:left;font-family: times,serif;font-size:20px'>NEPTIS focuses on cultural experience and cultural heritage exploitation defining and realizing
-
-CONCEPTOURING (from concept to cultural experience-oriented tour engineering), an integrated system
-
-prototype to create services and applications supporting itineraries and cultural heritage exploitation. These
-
-itineraries will offer an assisted access to citizens, tourists and visitors and a cultural heritage personalized
-
-experience before, during and after their visit. This App helps tourists and citizens to plan a tour inside a city or a museum
-        taking into account personal preferences,in order to improve the experience of visit a cultural place.
-        We want tourists not to waste time in deciding what is the first place to visit,but just to click and view the best tour to do.
-        Neptis make the journey easier than ever.</p>
-        </div>
-        <!--
-        <form name="logForm" ng-controller="myCtrl"  >
-        <fieldset style="float:right; margin-top: 80px">
-            <legend> Reserved Area </legend>
-            <div>
-                <label for='id' style="display:inline"> Id </label>
-                <input id='id'  name='id'ng-model="form.id" type="text" placeholder="Insert personal id" style="margin-left:160px" required>
-
+        
+            <div style="float:left; width:50%; margin-top: 80px">
+                <p align="center" style='float:left;font-family: times,serif;font-size:20px'>NEPTIS focuses on cultural experience and cultural heritage exploitation defining and realizing
+                    
+                    CONCEPTOURING (from concept to cultural experience-oriented tour engineering), an integrated system
+                    
+                    prototype to create services and applications supporting itineraries and cultural heritage exploitation. These
+                    
+                    itineraries will offer an assisted access to citizens, tourists and visitors and a cultural heritage personalized
+                    
+                    experience before, during and after their visit. This App helps tourists and citizens to plan a tour inside a city or a museum
+                    taking into account personal preferences,in order to improve the experience of visit a cultural place.
+                    We want tourists not to waste time in deciding what is the first place to visit,but just to click and view the best tour to do.
+                    Neptis make the journey easier than ever.</p>
             </div>
-             <div>
-                <label for='password' style="display:inline"> Password </label>
-                <input type='password'  id='password' name='password' ng-model="form.password" placeholder="Insert password" style="margin-left:98px" required>
-            </div>
-            <div ng-show="incorrect" style="color:maroon"> Username or password incorrect</div>
-            <input type='button' class="btn btn-default" value="Confirm" style='margin-left: 90px' ng-click="check(this)">
-
-
-        </fieldset>
-
-
-    </form>
-        !-->
-    <div class="container" ng-controller="myIndexController">
-    <div class="row" >
-        <div class="col-md-3 col-md-offset-3">
-            <div class="panel panel-default" >
-                <div class="panel-body">
-                    <h5 class="text-center">
-                        SIGN UP</h5>
-                    <form class="form form-signup" >
-                    <div class="form-group">
-                        <div class="input-group">
-                            <span class="input-group-addon"><span class="glyphicon glyphicon-user"></span></span>
-                            <input type="text" class="form-control" placeholder="Personal badge id" ng-model='form.id' required/>
+            <div class="container">
+            <div class="row" >
+                <div class="col-md-3 col-md-offset-3">
+                    <div class="panel panel-default" >
+                        <div class="panel-body">
+                            <h5 class="text-center">LOGIN</h5>
+                            <form name="loginForm" class="form form-signup" ng-submit="check(this)" ng-controller="indexPageController">
+                                <div class="form-group">
+                                    <div class="input-group">
+                                        <span class="input-group-addon"><span class="glyphicon glyphicon-user"></span></span>
+                                        <input name="badgeid" type="text" class="form-control" placeholder="Personal badge id" ng-model='badgeid' required/>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <div class="input-group">
+                                        <span class="input-group-addon"><span class="glyphicon glyphicon-lock"></span></span>
+                                        <input name="password" type="password" class="form-control" placeholder="Password" ng-model='password' required/>
+                                        
+                                    </div>
+                                </div>
+                                
+                                <div ng-if="submitted" >
+                                    <div class="alert alert-warning" ng-messages="loginForm.badgeid.$error" role="alert">
+                                        <div ng-message="required">You did not enter a field</div>
+                                        <div ng-message="minlength">Your field is too short</div>
+                                        <div ng-message="maxlength">Your field is too long</div>
+                                    </div>
+                                </div>
+                                <input type='submit' value='Login' class="btn btn-sm btn-primary btn-block">
+                            </form>
                         </div>
+                        
+                        
+                        
                     </div>
-
-                   <!-- <div class="form-group">
-                        <div class="input-group">
-                            <span class="input-group-addon"><span class="glyphicon glyphicon-envelope"></span>
-                            </span>
-                            <input type="text" class="form-control" placeholder="Email Address" />
-                        </div>
-                    </div> !-->
-                    <div class="form-group">
-                        <div class="input-group">
-                            <span class="input-group-addon"><span class="glyphicon glyphicon-lock"></span></span>
-                            <input type="password" class="form-control" placeholder="Password" ng-model='form.password' required/>
-
-                        </div>
-                    </div>
-
-                {{inputError}}
-                    <div class="alert alert-danger" ng-show="pwdWrong">
-                        <strong>Warning!</strong> Email or password incorrect!
-                    </div>
-
-                    <div class="alert alert-danger" ng-show="inputError">
-                        <strong>Warning!</strong> Missing input params or captcha not solved!
-                    </div>
-                   </form>
+                    
                 </div>
-
-                <div class="g-recaptcha"  ng-model="greCaptcha" data-sitekey='6Lflex4TAAAAAFkPr3pxpNNskgNbUvWe9FqaWJUM' data-callback='verifyCaptcha(g-recaptcha-response)' style="transform:scale(0.77);-mz-transform:scale(0.77);transform-origin:0 0;-mz-transform-origin:0 0;margin-left: 15px"></div>
-                <input type='button' value='submit' class="btn btn-sm btn-primary btn-block"  ng-click='check(this)'>
-
-
             </div>
-
         </div>
-    </div>
-</div>
-
-
+        
+        
     </body>
 </html>
