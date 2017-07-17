@@ -248,7 +248,7 @@ app.controller("curatorEditController", ['$scope','$log', '$http', 'Notification
             });
             
         $http({
-            url: $scope.server + "get_city/",
+            url: $scope.server + "cities/",
             method: "GET",
             responseType: "json"
         }).then(function(response) {
@@ -262,7 +262,7 @@ app.controller("curatorEditController", ['$scope','$log', '$http', 'Notification
         
         switch (struct) {
             case 'City':
-                $http.get($scope.server + 'get_city', {
+                $http.get($scope.server + 'cities', {
                     responseType: "application/json",
                     headers: {
                         'Content-Type': 'application/x-www-form-urlencoded',
@@ -297,7 +297,7 @@ app.controller("curatorEditController", ['$scope','$log', '$http', 'Notification
             case 'Museum':
                 $scope.museumJSON = [];
                 $scope.museumSel = {};
-                $http.get($scope.server + 'get_museum', {
+                $http.get($scope.server + 'museums', {
                     responseType: "application/json",
                     headers: {
                         'Content-Type': 'application/x-www-form-urlencoded',
@@ -494,57 +494,16 @@ app.controller("curatorEditController", ['$scope','$log', '$http', 'Notification
                     //serviva per provare parser-- $log.info("minuti della coda prima attrazione ",response.data);
                 });
         }
-        if ($scope.structure.selected.name === 'Opened Museum') {
-            $scope.attractionJSON = [];
-            toSend = {
-                area: areaID
-            };
-            $log.info("id area direttamente da select ", areaID);
-            $http({
-                    url: $scope.server + 'get_attractionOam',
-                    method: "POST",
-                    data: $.param(toSend),
-                    responseType: "application/json",
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                        'Accept': 'application/json'
-                    }
-                })
-                .then(function(response) {
-                    $log.info("risposta dal server ", response.data[0].name);
-                    attractionList = response.data;
-                    for (i = 0; i < attractionList.length; i++) {
-                        item = {};
-                        item['attractionName'] = attractionList[i].name;
-                        item['attractionId'] = attractionList[i].id;
-                        $scope.attractionJSON.push(item);
-                    }
-                    $scope.attractionJSON.sort(function(a, b) {
-                        if (a.areaName < b.areaName) //sort string ascending
-                            return -1;
-                        if (a.areaName > b.areaName)
-                            return 1;
-                        return 0;
-                    });
-                    //serviva per provare parser-- $log.info("minuti della coda prima attrazione ",response.data);
-                });
-        }
-
     };
 
     $scope.showAttraction = function(cityId) {
         $scope.attractionJSON = [];
         $log.info("id della citta scelta :", cityId);
-        toSend = {
-            city: cityId
-        };
         $http({
-                url: $scope.server + 'get_attractionC',
-                method: "POST",
-                data: $.param(toSend),
+                url: $scope.server + 'cities/' + cityId,
+                method: "GET",
                 responseType: "application/json",
                 headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
                     'Accept': 'application/json'
                 }
             })

@@ -5,18 +5,10 @@
   "description": "Back-end for the planner service of Neptis Project",
   "main": "main.js",
   "dependencies": {
-    "angular": "^1.6.4",
-    "angular-leaflet-directive": "^0.10.0",
-    "angular-messages": "^1.6.4",
-    "angular-sanitize": "^1.6.4",
-    "angular-ui-bootstrap": "^2.5.0",
-    "angular-ui-notification": "^0.3.6",
     "async": "^2.1.4",
     "body-parser": "^1.16.0",
-    "bootstrap": "^3.3.7",
     "express": "^4.14.0",
     "express-session": "^1.15.0",
-    "jquery": "^3.2.1",
     "line-by-line": "^0.1.5",
     "lodash": "^4.17.4",
     "moment": "^2.17.1",
@@ -25,14 +17,9 @@
     "process": "^0.11.9",
     "request": "^2.79.0",
     "shelljs": "^0.7.6",
-    "ui-leaflet": "^1.0.3",
-    "ui-leaflet-draw": "0.0.5",
-    "ui-leaflet-layers": "^0.1.3",
-    "ui-select": "^0.19.8",
     "winston": "^2.3.1"
   },
   "devDependencies": {
-    "browserify": "^14.4.0",
     "gulp": "^3.9.1",
     "gulp-bower": "0.0.13",
     "gulp-clean-css": "^2.3.2",
@@ -41,21 +28,17 @@
     "gulp-jshint": "^2.0.4",
     "gulp-less": "^3.3.2",
     "gulp-load-plugins": "^1.4.0",
-    "gulp-main-npm-files": "^1.0.5",
     "gulp-notify": "^3.0.0",
     "gulp-rename": "^1.2.2",
     "gulp-ruby-sass": "^2.1.1",
-    "gulp-streamify": "^1.0.2",
     "gulp-uglify": "^2.0.1",
-    "jshint": "^2.9.5",
+    "jshint": "^2.9.4",
     "main-bower-files": "^2.13.1",
     "neo4j": "^2.0.0-RC2",
     "pump": "^1.0.2"
   },
   "scripts": {
-    "lint": "jshint **.js",
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node main"
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "Thomas Collerton",
   "license": "MIT"

@@ -334,7 +334,7 @@ app.controller("curatorCreationController", ['$scope', '$http', 'Notification', 
                     attractions: JSON.stringify($scope.cityAttractions),
                 };
                 $http({
-                        url: $scope.server + 'addCity',
+                        url: $scope.server + 'cities',
                         method: "POST",
                         data: $.param(toSend),
                         responseType: "json",
@@ -381,7 +381,7 @@ app.controller("curatorCreationController", ['$scope', '$http', 'Notification', 
                 };
                 console.log(toSend);
                 $http({
-                    url: $scope.server + 'addMuseum',
+                    url: $scope.server + 'museums',
                     method: "POST",
                     data: $.param(toSend),
                     responseType: "application/json",
