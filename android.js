@@ -11,6 +11,9 @@ var app = require('./curatore');
 var logger = require('./logger');
 var config = require('./public/resources/config.json');
 
+//variable to hold the regular expression to match the ids of newlyPOSTed resources
+var regex = /\d+$/g;
+
 var serverUrl = config.serverUrl;
 var appName = config.webapp;
 var serverName = serverUrl  + appName;
@@ -130,15 +133,6 @@ app.post('/user_registration', function(req, res) {
     });
 });
 
-// call to compute plan
-//*** REQUIRED ***: Json Object with user preferences (type, name (of the problem), availabletime, must, exclued)
-/*Steps:
-1)Take problem name.pddl ('/create-pddl')
-2) add preferences (tcoda, starting point, metric and goal) to the file
-3) call pddl script passing domain.pddl and problem.pddl FILE
-4) wait for the result and return it back to the client;
-*/
-//1 per city, 1 per museo, 1 per oam
 app.post('/compute-plan-city', function(req, res) {
     pathName = '[' + req.path + '] ';
     var umail = req.body.mail;
@@ -147,9 +141,7 @@ app.post('/compute-plan-city', function(req, res) {
     var uid = req.body.id; //1 = roma
     var visits = req.body.number_visits;
     var must = req.body.must; //must
-    logger.debug("must", must);
     var exclude = req.body.exclude; //exclude
-    logger.debug("exclude",exclude);
     var lat = req.body.lat;
     var lon = req.body.lon;
     var dd = req.body.data;
@@ -238,91 +230,38 @@ app.post('/compute-plan-city', function(req, res) {
                 function(callback) {
                     //** SENSING PART **
                     // -- T CODA
-                    var urlCoda = serverName + "sensing/queue/cityId=" + uid;
+                    var urlSensing = serverName + "sensing/cityId=" + uid;
                     request({
-                        url: urlCoda,
+                        url: urlSensing,
                         method: "GET",
                         json: true,
                         headers: [{
                                 'content-type': 'application/json'
                             }]
-                    }, function(error, response, body) {
-                        if (error)
+                    }, function(error,response, body) {
+                        //body content: [{attractionM:{}, value:double}]
+                        if (error) {
                             logger.err(error);
+                            callback(error);
+                        }
                         if (!error & response.statusCode === 200) {
-
-                            if (body.length > 1) {
-                                for (let i = 0; i < body.length; i++) {
-                                    let queue = body[i].TQueue;
-                                    if(queue !== undefined && queue.attractionC !== undefined) {
-                                        var id = body[i].TQueue.attractionC.id;
-                                        attractionsTimeMap[id] += +(body[i].TQueue.minutes);
-                                    }
+                            string = "";
+                            for (let i = 0; i < body.length; i++) {
+                                let id = body[i].attractionC.id;
+                                let cost = parseInt(Math.round(parseFloat(body[i].value)),10);
+                                for (let j = 0; j < visits; j++) {
+                                    string += "(:action visit-v" + j + "-" + id + "\n\t\t";
+                                    string += ":precondition (and (cur_state top_" + id + ") (cur_state v" + j + ") (not (visited att_" + id + ")))\n\t\t";
+                                    string += ":effect (and (cur_state v" + (j + 1) + ") (not (cur_state v" + j + ")) (visited att_" + id +") (increase (total-cost) " + cost +"))\n\t)\n\t";
                                 }
-                            } else {
-                                logger.info(pathName + "WARNING: sensing part of tcoda is empty!");
-                                res.status(500).end();
-                                return;
                             }
-
-                            //-- TVISITA
-                            var urlVisita = serverName + "sensing/visit/cityId=" + uid;
-
-                            request({
-                                url: urlVisita,
-                                method: "GET",
-                                json: true,
-                                headers: [{
-                                        'content-type': 'application/json'
-                                    }]
-                            }, function(error, response, body) {
-                                if (!error & response.statusCode === 200) {
-                                    if (body.length > 1) {
-                                        // se sensing ha 1 o 0 tuple ---> problema sulla length
-                                        for (let i = 0; i < body.length; i++) {
-                                            let visit = body[i].TVisit;
-                                            if(visit !== undefined && visit.attractionC !== undefined) {
-                                                var id = body[i].TVisit.attractionC.id;
-                                                attractionsTimeMap[id] += +(body[i].TVisit.minutes);
-                                            }
-                                        }
-                                        callback();
-                                    } else {
-                                        logger.info(pathName + "WARNING: sensing part of TVisit is empty!");
-                                        res.status(500).end();
-                                        return;
-                                    }
-                            } else { // no 200 tmove
-                                res.status(500).end();
-                                logger.info(pathName + "TVisit: Internal server error");
-                                return;
-                            }
-                        }); // fine request TVisit
-
-                    } else { //fine 200 TCODA
-                        res.status(500).end();
-                        logger.info("tcoda: Internal server error");
-                        return;
-                    }
-
-                    }); //fine request tCoda
-                },
-                //Scrivi i dati ottenuti dal sensing
-                function(callback) {
-                    string = "";
-                    _.forIn(attractionsTimeMap, function(cost,id) {
-                        //Sistema costi
-                        cost = 1;
-                        if(!(_.includes(exclude, id))) {
-                            for (let j = 0; j < visits; j++) {
-                                string += "(:action visit-v" + j + "-" + id + "\n\t\t";
-                                string += ":precondition (and (cur_state top_" + id + ") (cur_state v" + j + ") (not (visited att_" + id + ")))\n\t\t";
-                                string += ":effect (and (cur_state v" + (j + 1) + ") (not (cur_state v" + j + ")) (visited att_" + id +") (increase (total-cost) " + cost +"))\n\t)\n\t";
-                            }
+                            fs.appendFileSync(domainFile, string, 'utf-8');
+                            callback();
+                        } else {
+                            res.sendStatus(500);
+                            //callback(error);
                         }
                     });
-                    fs.appendFileSync(domainFile, string, 'utf-8');
-                    callback();
                 },
                 //Write the rest of the domain file
                 function(callback) {
@@ -370,7 +309,6 @@ app.post('/compute-plan-city', function(req, res) {
                                     string += ":precondition (cur_state top_" + loc2.id + ")\n\t\t";
                                     string += ":effect (and (cur_state top_" + loc1.id + ") (not(cur_state top_" + loc2.id + ")) ";
                                     string += "(increase (total-cost) " + minutes + "))\n\t)\n\t";
-                                    logger.debug(string)
                                     fs.appendFileSync(domainFile, string, 'utf8');
                                 }
                             } else {
@@ -381,7 +319,6 @@ app.post('/compute-plan-city', function(req, res) {
                     }
 
                     function distanceFromStart2(lat, long, destination, umail) {
-                        logger.debug("start lat: ", lat);
                         var apiKey = ' AIzaSyCvJCBmyIVGAPPJYJqjMobgZ5aQfT6CRmQ ';
                         var reqUrl = "https://maps.googleapis.com/maps/api/distancematrix/json?origins=" + lat + "," + long;
                         reqUrl += "&destinations=" + destination.latitude + "," + destination.longitude;
@@ -396,7 +333,6 @@ app.post('/compute-plan-city', function(req, res) {
                         }, function(error, response, body) {
                             logger.debug(response.statusCode);
                             if (!error & response.statusCode === 200) {
-                                logger.debug(body);
                                 if (body.status === 'OK') {
                                     var time = body.rows[0].elements[0].duration.value;
                                     time = +time;
@@ -506,549 +442,6 @@ app.post('/compute-plan-city', function(req, res) {
 
     } //fine Goal&Planner
 }); //fine plan
-//------------------------------------------------------------------------------------------------------------
-
-/* REPORT */
-app.post('/report_queue', function(req, res) {
-    pathName = '[' + req.path + '] ';
-    var category = req.body.category;
-    var attrId = req.body.attractionId;
-    var minutes = req.body.minutes;
-    var dd = req.body.data; // aggiungerla in sensing
-
-    // se esiste una tupla in tcoda di colosseo 10' non devo aggiungere in tcoda ma solo in sensing
-	logger.info(pathName + "category: %s", category);
-    if (category === 'city') {
-            request({
-                url: serverName + "queue/" + attrId + "," + minutes,
-                method: "GET",
-                json: true,
-                headers: [{
-                    'content-type': 'application/json'
-                }]
-            }, function(error, response, body) {
-                logger.info("Request statusCode: " + response.statusCode);
-                //logger.info("*** response ", response);
-                if (!error & response.statusCode === 200) {
-                    logger.info("*** Get tcoda from minutes and attraction succeded *** ");
-
-                    if (body.length > 0) {
-                        //there exists a queue for that attraction with those minutes so we have to add only in sensing table
-                        var tcodaId = body[0].id;
-                        logger.debug(tcodaId);
-                        request({
-                            url: serverName + "sensing/",
-                            method: "POST",
-                            json: {
-                                data: dd,
-                                TQueue: {
-                                    id: tcodaId
-                                }
-                            },
-                            headers: [{
-                                'content-type': 'application/json'
-                            }]
-                        }, function(error, response, body) {
-                            logger.info("Request statusCode: " + response.statusCode);
-                            //logger.info("*** response ", response);
-                            if (!error & response.statusCode === 204) {
-                                logger.info("*** Post only in sensing succeded *** ");
-                                res.status(response.statusCode);
-                                res.send({
-                                    response: 'ok'
-                                });
-
-                                return;
-                            }
-
-                        });
-                    } else {
-                        logger.info("No tuple found in tcoda with those parameters,add in tcoda and sensing...");
-                        // we have to add both in Tcoda and sensing tables
-                        /*
-                         * 1. add in Tcoda
-                         * 2. retrieve id of tupla just added
-                         * 3. insert into Sensing the instance of tcoda
-                         */
-                        /* 1. */
-                        request({
-                            url: serverName + "queue/",
-                            method: "POST",
-                            json: {
-                                minutes: minutes,
-                                attractionC: {
-                                    id: attrId
-                                }
-                            },
-                            headers: [{
-                                'content-type': 'application/json'
-                            }]
-                        }, function(error, response, body) {
-                            logger.info("Request statusCode: " + response.statusCode);
-                            //logger.info("*** response ", response);
-                            if (!error & response.statusCode === 204) {
-                                logger.info("*** Tcoda added  *** ");
-                                /* 2. */
-                                request({
-                                    url: serverName + "queue/" + attrId + "," + minutes,
-                                    method: "GET",
-                                    json: true,
-                                    headers: [{
-                                        'content-type': 'application/json'
-                                    }]
-                                }, function(error, response, body) {
-                                    logger.info("Request statusCode: " + response.statusCode);
-                                    //logger.info("*** response ", response);
-                                    if (!error & response.statusCode === 200) {
-                                        logger.info("*** Get tcoda succeded *** ");
-                                        tcodaId = body[0].id;
-                                        /* 3. */
-                                        request({
-                                            url: serverName + "sensing/",
-                                            method: "POST",
-                                            json: {
-                                                data: dd,
-                                                TQueue: {
-                                                    id: tcodaId
-                                                }
-                                            },
-                                            headers: [{
-                                                'content-type': 'application/json'
-                                            }]
-                                        }, function(error, response, body) {
-                                            logger.info("Request statusCode: " + response.statusCode);
-                                            //logger.info("*** response ", response);
-                                            if (!error & response.statusCode === 204) {
-                                                logger.info("*** POST sensing succeded *** ");
-                                                res.status(response.statusCode);
-                                                res.send({
-                                                    response: 'ok'
-                                                });
-                                                return;
-                                            } else logger.info("ERROR while posting in sensing");
-                                        });
-                                        return;
-                                    } else logger.info("ERROR in getting tcoda");
-
-                                });
-                                return;
-                            } else logger.info("ERROR: tcoda not added!");
-
-                        });
-                    }
-                    return;
-                }
-            });
-        }
-    else if (category === "museum") {
-            request({
-                url: serverName + "queue/museum/" + attrId + "," + minutes,
-                method: "GET",
-                json: true,
-                headers: [{
-                    'content-type': 'application/json'
-                }]
-            }, function(error, response, body) {
-                logger.info("Request statusCode: " + response.statusCode);
-                //logger.info("*** response ", response);
-                if (!error & response.statusCode === 200) {
-                    logger.info("*** Get tcoda from minutes and attraction succeded *** ");
-
-                    if (body.length > 0) {
-                        //there exists a queue for that attraction with those minutes so we have to add only in sensing table
-                        var tcodaId = body[0].id;
-                        request({
-                            url: serverName + "sensing/",
-                            method: "POST",
-                            json: {
-                                data: dd,
-                                TQueue: {
-                                    id: tcodaId
-                                }
-                            },
-                            headers: [{
-                                'content-type': 'application/json'
-                            }]
-                        }, function(error, response, body) {
-                            logger.info("Request statusCode: " + response.statusCode);
-                            //logger.info("*** response ", response);
-                            if (!error & response.statusCode === 204) {
-                                logger.info("*** Post only in sensing succeded *** ");
-                                res.status(response.statusCode);
-                                res.send({
-                                    response: 'ok'
-                                });
-
-                                return;
-                            }
-
-                        });
-                    } else {
-                        logger.info("No tuple found in tcoda with those parameters,add in tcoda and sensing...");
-                        // we have to add both in Tcoda and sensing tables
-                        /*
-                         * 1. add in Tcoda
-                         * 2. retrieve id of tupla just added
-                         * 3. insert into Sensing the instance of tcoda
-                         */
-                        /* 1. */
-                        request({
-                            url: serverName + "queue/",
-                            method: "POST",
-                            json: {
-                                minutes: minutes,
-                                attractionM: {
-                                    id: attrId
-                                }
-                            },
-                            headers: [{
-                                'content-type': 'application/json'
-                            }]
-                        }, function(error, response, body) {
-                            logger.info("Request statusCode: " + response.statusCode);
-                            if (!error & response.statusCode === 204) {
-                                logger.info("*** Tcoda added  *** ");
-                                /* 2. */
-                                request({
-                                    url: serverName + "queue/museum/" + attrId + "," + minutes,
-                                    method: "GET",
-                                    json: true,
-                                    headers: [{
-                                        'content-type': 'application/json'
-                                    }]
-                                }, function(error, response, body) {
-                                    logger.info("Request statusCode: " + response.statusCode);
-                                    //logger.info("*** response ", response);
-                                    if (!error & response.statusCode === 200) {
-                                        logger.info("*** Get tcoda succeded *** ");
-                                        logger.debug(body[0]);
-                                        var tcodaId = body[0].id;
-                                        /* 3. */
-                                        request({
-                                            url: serverName + "sensing/",
-                                            method: "POST",
-                                            json: {
-                                                data: dd,
-                                                TQueue: {
-                                                    id: tcodaId
-                                                }
-                                            },
-                                            headers: [{
-                                                'content-type': 'application/json'
-                                            }]
-                                        }, function(error, response, body) {
-                                            logger.info("Request statusCode: " + response.statusCode);
-                                            //logger.info("*** response ", response);
-                                            if (!error & response.statusCode === 204) {
-                                                logger.info("*** POST sensing succeded *** ");
-                                                res.status(response.statusCode);
-                                                res.send({
-                                                    response: 'ok'
-                                                });
-                                                return;
-                                            } else logger.info("ERROR while posting in sensing");
-                                        });
-                                        return;
-                                    } else logger.info("ERROR in getting tcoda");
-
-                                });
-                                return;
-                            } else logger.info("ERROR: tcoda not added!");
-
-                        });
-                    }
-                    return;
-                }
-            });
-        } // if museum
-}); // route_queue
-
-app.post('/report_visit', function(req,res) {
-    pathName = '[' + req.path + '] ';
-    logger.info(pathName);
-
-    var category = req.body.category;
-    var attrId = req.body.attractionId;
-    var minutes = req.body.minutes;
-    var dd = req.body.data; // aggiungerla in sensing
-
-    if (category === 'city') {
-        request({
-            url: serverName + "visit/" + attrId + "," + minutes,
-            method: "GET",
-            json: true,
-            headers: [{
-                'content-type': 'application/json'
-            }]
-        }, function(error, response, body) {
-            logger.info("Request statusCode: " + response.statusCode);
-            //logger.info("*** response ", response);
-            if (!error & response.statusCode === 200) {
-                logger.info("*** Get visit time from minutes and attraction succeded *** ");
-
-                if (body.length > 0) {
-                    //there exists a visit time for that attraction with those minutes so we have to add only in sensing table
-                    tvisitaId = body[0].id;
-                    request({
-                        url: serverName + "sensing/",
-                        method: "POST",
-                        json: {
-                            data: dd,
-                            TVisit: {
-                                id: tvisitaId
-                            }
-                        },
-                        headers: [{
-                            'content-type': 'application/json'
-                        }]
-                    }, function(error, response, body) {
-                        logger.info("Request statusCode: " + response.statusCode);
-                        //logger.info("*** response ", response);
-                        if (!error & response.statusCode === 204) {
-                            logger.info("*** Post only in sensing succeded *** ");
-                            res.status(response.statusCode);
-                            res.send({
-                            });
-
-                            return;
-                        }
-
-                    });
-                } else {
-                    logger.info("No tuple found in TVISITA with those parameters,add in tvisita and sensing...");
-                    // we have to add both in Tcoda and sensing tables
-                    /*
-                     * 1. add in Tcoda
-                     * 2. retrieve id of tupla just added
-                     * 3. insert into Sensing the instance of tcoda
-                     */
-                    /* 1. */
-                    request({
-                        url: serverName + "visit/",
-                        method: "POST",
-                        json: {
-                            minutes: minutes,
-                            attractionC: {
-                                id: attrId
-                            }
-                        },
-                        headers: [{
-                            'content-type': 'application/json'
-                        }]
-                    }, function(error, response, body) {
-                        logger.info("Request statusCode: " + response.statusCode);
-                        //logger.info("*** response ", response);
-                        if (!error & response.statusCode === 204) {
-                            logger.info("*** Tvisita added  *** ");
-                            /* 2. */
-                            request({
-                                url: serverName + "visit/" + attrId + "," + minutes,
-                                method: "GET",
-                                json: true,
-                                headers: [{
-                                    'content-type': 'application/json'
-                                }]
-                            }, function(error, response, body) {
-                                logger.info("Request statusCode: " + response.statusCode);
-                                //logger.info("*** response ", response);
-                                if (!error & response.statusCode === 200) {
-                                    logger.info("*** Get tcoda succeded *** ");
-                                    tvisitaId = body[0].id;
-                                    /* 3. */
-                                    request({
-                                        url: serverName + "sensing/",
-                                        method: "POST",
-                                        json: {
-                                            data: dd,
-                                            TVisit: {
-                                                id: tvisitaId
-                                            }
-                                        },
-                                        headers: [{
-                                            'content-type': 'application/json'
-                                        }]
-                                    }, function(error, response, body) {
-                                        logger.info("Request statusCode: " + response.statusCode);
-                                        //logger.info("*** response ", response);
-                                        if (!error & response.statusCode === 204) {
-                                            logger.info("*** POST sensing succeded *** ");
-                                            res.status(response.statusCode);
-                                            res.send({
-                                                response: 'ok'
-                                            });
-                                            return;
-                                        } else logger.info("ERROR while posting in sensing");
-                                    });
-                                    return;
-                                } else logger.info("ERROR in getting tvisita");
-
-                            });
-                            return;
-                        } else logger.info("ERROR: tvisita not added!");
-
-                    });
-                }
-                return;
-            }
-        });
-    }
-
-    if (category === 'museum') {
-        request({
-            url: serverName + "visit/museum/" + attrId + "," + minutes,
-            method: "GET",
-            json: true,
-            headers: [{
-                'content-type': 'application/json'
-            }]
-        }, function(error, response, body) {
-            logger.info("Request statusCode: " + response.statusCode);
-            //logger.info("*** response ", response);
-            if (!error & response.statusCode === 200) {
-                logger.info("*** Get visit time from minutes and attraction succeded *** ");
-
-                if (body.length > 0) {
-                    //there exists a visit time for that attraction with those minutes so we have to add only in sensing table
-                    var tvisitaId = body[0].id;
-                    request({
-                        url: serverName + "sensing/",
-                        method: "POST",
-                        json: {
-                            data: dd,
-                            TVisit: {
-                                id: tvisitaId
-                            }
-                        },
-                        headers: [{
-                            'content-type': 'application/json'
-                        }]
-                    }, function(error, response, body) {
-                        logger.info("Request statusCode: " + response.statusCode);
-                        //logger.info("*** response ", response);
-                        if (!error & response.statusCode === 204) {
-                            logger.info("*** Post only in sensing succeded *** ");
-                            res.sendStatus(200);
-                            //res.send({ response : 'ok'})
-
-                            return;
-                        }
-
-                    });
-                } else {
-                    logger.info("No tuple found in TVISITA with those parameters,add in tvisita and sensing...");
-                    // we have to add both in Tcoda and sensing tables
-                    /*
-                     * 1. add in Tcoda
-                     * 2. retrieve id of tupla just added
-                     * 3. insert into Sensing the instance of tcoda
-                     */
-                    /* 1. */
-                    request({
-                        url: serverName + "visit/",
-                        method: "POST",
-                        json: {
-                            minutes: minutes,
-                            attractionM: {
-                                id: attrId
-                            }
-                        },
-                        headers: [{
-                            'content-type': 'application/json'
-                        }]
-                    }, function(error, response, body) {
-                        logger.info("Request statusCode: " + response.statusCode);
-                        //logger.info("*** response ", response);
-                        if (!error & response.statusCode === 204) {
-                            logger.info("*** Tvisita added  *** ");
-                            /* 2. */
-                            request({
-                                url: serverName + "visit/museum/" + attrId + "," + minutes,
-                                method: "GET",
-                                json: true,
-                                headers: [{
-                                    'content-type': 'application/json'
-                                }]
-                            }, function(error, response, body) {
-                                logger.info("Request statusCode: " + response.statusCode);
-                                //logger.info("*** response ", response);
-                                if (!error & response.statusCode === 200) {
-                                    logger.info("*** Get tcoda succeded *** ");
-                                    var tvisitaId = body[0].id;
-                                    /* 3. */
-                                    request({
-                                        url: serverName + "sensing/",
-                                        method: "POST",
-                                        json: {
-                                            data: dd,
-                                            TVisit: {
-                                                id: tvisitaId
-                                            }
-                                        },
-                                        headers: [{
-                                            'content-type': 'application/json'
-                                        }]
-                                    }, function(error, response, body) {
-                                        logger.info("Request statusCode: " + response.statusCode);
-                                        //logger.info("*** response ", response);
-                                        if (!error & response.statusCode === 204) {
-                                            logger.info("*** POST sensing succeded *** ");
-                                            res.sendStatus(200);
-                                            //res.send({ response : 'ok'})
-                                            return;
-                                        } else logger.info("ERROR while posting in sensing");
-                                    });
-                                    return;
-                                } else logger.info("ERROR in getting tvisita");
-
-                            });
-                            return;
-                        } else logger.info("ERROR: tvisita not added!");
-
-                    });
-                }
-                return;
-            }
-        });
-    } // if category museum
-});
-
-app.post('/report_rating', function(req,res) {
-    pathName = '[' + req.path + '] ';
-    logger.info(pathName);
-
-    var type = req.body.type;
-    var attrId = req.body.attractionId;
-    var rating = +req.body.rating;
-    var dd = req.body.data; // aggiungerla in sensing
-    logger.debug("rating", rating);
-    res.sendStatus(200).end();
-
-});
-
-app.get('/get_area_m',function(req,res) {
-    var id = req.query.id;
-    request({
-        url: serverName + "aream/museumId=" + id,
-        method: "GET",
-        json: true,
-        headers: [{
-            'content-type': 'application/json'
-        }]
-
-    }, function(error, response, body) {
-        logger.debug(response.status);
-        logger.debug(body);
-        if (!error & response.statusCode === 200) {
-            logger.info(pathName + "***  get response : ", body);
-            res.status(response.statusCode);
-            res.send(body);
-            return;
-        } else {
-            logger.info(pathName + "/get_aream failed!: ");
-            return;
-        }
-    });
-});
 
 app.post('/compute-plan-museum', function(req, res) {
     pathName = '[' + req.path + '] ';
@@ -1061,11 +454,14 @@ app.post('/compute-plan-museum', function(req, res) {
 
     var must = req.body.must; //must
     var exclude = req.body.exclude; //exclude
+    logger.debug(JSON.stringify(exclude));
 
     //Proper room management
     var rooms = {};
     var roomsName2Id = {};
     var attr2room = {};
+    var roomIds = {};
+    var adjacencies = {};
 
     var attractionsMap = {};
 
@@ -1102,202 +498,158 @@ app.post('/compute-plan-museum', function(req, res) {
             var adjPath = __dirname + "/adjacencies/" + attractions[0].areaM.museum.city.name + "/" + attractions[0].areaM.museum.name;
             var json = fs.readFileSync(adjPath,'utf-8');
             var adj = JSON.parse(json);
-            startRoom = adj.start;
-            endRoom = adj.end;
+            request({
+                url: serverName + "adj/museumId="+uid,
+                    method: "GET"
+            }, function(req,res,body) {
+                adjacencies = JSON.parse(body);
+                //Write problem.pddl
+                problemData = "(define (problem Visit) (:domain Museum)\n\t(:objects\n\t\tstart ";
 
-            //Write problem.pddl
-            problemData = "(define (problem Visit) (:domain Museum)\n\t(:objects\n\t\tstart ";
+                for (let i = 0; i < attractions.length; i++) {
+                    var areaName = attractions[i].areaM.name.toLowerCase().replace(/ /g, '_');
+                    if(roomsName2Id[areaName] === undefined)
+                        roomsName2Id[areaName] = attractions[i].areaM;
+                    if(rooms[areaName] === undefined)
+                        rooms[areaName] = [];
+                    rooms[areaName].push(attractions[i].id);
 
-            for (let i = 0; i < attractions.length; i++) {
-                var areaName = attractions[i].areaM.name.toLowerCase().replace(/ /g, '_');
-                if(roomsName2Id[areaName] === undefined)
-                    roomsName2Id[areaName] = attractions[i].areaM;
-                if(rooms[areaName] === undefined)
-                    rooms[areaName] = [];
-                rooms[areaName].push(attractions[i].id);
-            }
+                    roomIds[attractions[i].areaM.id] = areaName;
+                }
+                startRoom = roomIds[adjacencies.start];
+                endRoom = roomIds[adjacencies.end];
 
-            logger.debug(JSON.stringify(rooms));
-
-            _.forIn(rooms,function(value,key) {
-                _.forEach(value, function(v) {
-                   attr2room[v] = key;
+                _.forIn(rooms,function(value,key) {
+                    _.forEach(value, function(v) {
+                       attr2room[v] = key;
+                    });
                 });
-            });
-            logger.debug(JSON.stringify(attr2room));
 
-            _.forIn(rooms, function(value, key) {
-                if(key !== "start")
-                    problemData += key + " ";
-            });
-
-            problemData += "- topology_state\n\t\t";
-            for(let i = 0; i <= visits; i++)
-                problemData += "v" + i + " ";
-            problemData += "- visit_state\n\t\t";
-
-            _.forIn(rooms, function(room, key) {
-                _.forEach(room, function(attraction) {
-                    problemData += attraction + " ";
+                _.forIn(rooms, function(value, key) {
+                    if(key !== "start")
+                        problemData += key + " ";
                 });
-            });
 
-            problemData += "- attraction\n\t)\n\t";
-            problemData += "(:init\n\t\t(cur_state " + startRoom + ")\n\t\t(cur_state v0)\n\n\t\t(= (total-cost) 0)\n\t)\n\n\t";
-            problemData += "(:goal\n\t\t(and\n\t\t\t(cur_state v" + visits + ")\n\t\t\t(cur_state " + endRoom + ")\n\t\t";
-            _.forEach(must, function(attraction) {
-                problemData += "\t(visited " + attraction + ")\n\t\t"
-            });
-            problemData += "\n\t\t)\n\t)\n\t(:metric minimize (total-cost))\n)";
-            fs.writeFile(problemFile,
-                problemData,
-                'utf8',
-                function (err) {
-                    if (err) {
-                        logger.err(err);
-                    }
-                    logger.info("The problem file: ", uname + "_problem.pddl was created!");
-            });
+                problemData += "- topology_state\n\t\t";
+                for(let i = 0; i <= visits; i++)
+                    problemData += "v" + i + " ";
+                problemData += "- visit_state\n\t\t";
 
-            /*var roomAttractionsMap = {};
-            for(var i = 0; i < attractions.length; i++)
-                roomAttractionsMap[attractions[i].name.toLowerCase().replace(/ /g, "_")] = attractions[i].areaM.name.toLowerCase().replace(/ /g, "_");
-            */
-            //Write domain.pddl
-            var domainHeader = "(define (domain Museum)\n\t(:requirements :typing :equality)\n\t(:types topology_state visit_state - state attraction)\n\t" +
-                    "(:predicates\n\t\t(cur_state ?s - state)\n\t\t(visited ?a - attraction)\n\t)\n\t(:functions\n\t\t(total-cost)\n\t)\n\t";
+                _.forIn(rooms, function(room, key) {
+                    _.forEach(room, function(attraction) {
+                        problemData += attraction + " ";
+                    });
+                });
 
-            var attractionsTimeMap = {};
-            async.series([
-                //Write the header of the domain file
-                function(callback) {
-                    fs.writeFileSync(domainFile, domainHeader, 'utf8');
-                    logger.info("The domain file: ", uname + "_domain.pddl was created!");
-                    callback();
-                },
-                //Write sensing stuff on the domain
-                function(callback) {
-                    //** SENSING PART **
-                    // -- T CODA
-                    var urlCoda = serverName + "sensing/queue/museum/museumId=" + uid;
-                    request({
-                        url: urlCoda,
-                        method: "GET",
-                        json: true,
-                        headers: [{
-                                'content-type': 'application/json'
-                            }]
-                    }, function(error, response, body) {
-                        logger.debug(response.statusCode);
-                        if (error)
-                            logger.err(error);
-                        if (!error && response.statusCode === 200) {
-                            if (body.length > 1) {
-                                for(let i = 0; i < body.length; i++) {
-                                    let queue = body[i].TQueue;
-                                    if(queue !== undefined && queue.attractionM !== undefined) {
-                                        var name = body[i].TQueue.attractionM.id;
-                                        attractionsTimeMap[name] = +(body[i].TQueue.minutes);
+                problemData += "- attraction\n\t)\n\t";
+                problemData += "(:init\n\t\t(cur_state " + startRoom + ")\n\t\t(cur_state v0)\n\n\t\t(= (total-cost) 0)\n\t)\n\n\t";
+                problemData += "(:goal\n\t\t(and\n\t\t\t(cur_state v" + visits + ")\n\t\t\t(cur_state " + endRoom + ")\n\t\t";
+                _.forEach(must, function(attraction) {
+                    problemData += "\t(visited " + attraction + ")\n\t\t"
+                });
+                problemData += "\n\t\t)\n\t)\n\t(:metric minimize (total-cost))\n)";
+                fs.writeFile(problemFile,
+                    problemData,
+                    'utf8',
+                    function (err) {
+                        if (err) {
+                            logger.err(err);
+                        }
+                        logger.info("The problem file: ", uname + "_problem.pddl was created!");
+                });
+
+                //Write domain.pddl
+                var domainHeader = "(define (domain Museum)\n\t(:requirements :typing :equality)\n\t(:types topology_state visit_state - state attraction)\n\t" +
+                        "(:predicates\n\t\t(cur_state ?s - state)\n\t\t(visited ?a - attraction)\n\t)\n\t(:functions\n\t\t(total-cost)\n\t)\n\t";
+
+                var attractionsTimeMap = {};
+                async.series([
+                    //Write the header of the domain file
+                    function(callback) {
+                        fs.writeFileSync(domainFile, domainHeader, 'utf8');
+                        logger.info("The domain file: ", uname + "_domain.pddl was created!");
+                        callback();
+                    },
+                    function(callback) {
+                        //** SENSING PART **
+                        var urlSensing = serverName + "sensing/museumId=" + uid;
+                        request({
+                            url: urlSensing,
+                            method: "GET",
+                            json: true,
+                            headers: [{
+                                    'content-type': 'application/json'
+                                }]
+                        }, function(error,response, body) {
+                            //body content: [{attractionM:{}, value:double}]
+                            if (error) {
+                                logger.err(error);
+                                callback(error);
+                            }
+                            if (!error & response.statusCode === 200) {
+                                string = "";
+                                for (let i = 0; i < body.length; i++) {
+                                    let id = body[i].attractionM.id;
+                                    let cost = parseInt(Math.round(parseFloat(body[i].value)),10);
+                                    for (let j = 0; j < visits; j++) {
+                                        string += "(:action visit-v" + j + "-" + id + "\n\t\t";
+                                        string += ":precondition (and (cur_state " + attr2room[id] + ") (cur_state v" + j + ") (not (visited att_" + id + ")))\n\t\t";
+                                        string += ":effect (and (cur_state v" + (j + 1) + ") (not (cur_state v" + j + ")) (visited att_" + id +") (increase (total-cost) " + cost +"))\n\t)\n\t";
                                     }
                                 }
+                                fs.appendFileSync(domainFile, string, 'utf-8');
+                                callback();
                             } else {
-                                logger.info(pathName + "WARNING: sensing part of TQueue is empty!");
-                                res.status(500).end();
-                                return;
+                                res.sendStatus(500);
+                                callback(error);
                             }
+                        });
+                    },
+                    //Write the rest of the domain file
+                    function(callback) {
+                        var string;
+                        var adjPath = __dirname + "/adjacencies/" + attractions[0].areaM.museum.city.name + "/" + attractions[0].areaM.museum.name;
+                        var json = fs.readFileSync(adjPath,'utf-8');
+                        var adj = JSON.parse(json);
+                        _.forIn(adjacencies, function(value,key) {
+                            var minutes = 1;
+                            if(key !== "start" && key !== "end") {
+                                var src = roomIds[key];
+                                _.forEach(value, function(next) {
+                                    next = roomIds[next];
+                                    string = "(:action move-" + src + "-" + next + "\n\t\t";
+                                    string += ":precondition (cur_state " + src + ")\n\t\t";
+                                    string += ":effect (and (cur_state " + next + ") (not(cur_state " + src + ")) ";
+                                    string += "(increase (total-cost) " + minutes + "))\n\t)\n\t";
 
-                            //-- TVISITA
-                            var urlVisita = serverName + "sensing/visit/museum/museumId=" + uid;
-
-                            request({
-                                url: urlVisita,
-                                method: "GET",
-                                json: true,
-                                headers: [{
-                                        'content-type': 'application/json'
-                                    }]
-                            }, function(error, response, body) {
-                                if (!error && response.statusCode === 200) {
-                                    for(let i = 0; i < body.length; i++) {
-                                        let visit = body[i].TVisit;
-                                        if(visit !== undefined && visit.attractionM !== undefined) {
-                                            var name = body[i].TVisit.attractionM.id;
-                                            attractionsTimeMap[name] = +(body[i].TVisit.minutes);
-                                        }
-                                    }
-                                    callback();
-                                } else { // no 200 tmove
-                                    res.status(500).end();
-                                    logger.info(pathName + "TVisit: Internal server error");
-                                    return;
-                                }
-                            });
-
-                        } else { //fine 200 TCODA
-                            res.status(500).end();
-                            logger.info("TQueue: Internal server error");
-                            return;
-                        }
-
-                    }); //fine request tCoda
-                },
-                function(callback) {
-                    string = "";
-                    _.forIn(attractionsTimeMap, function(cost,id) {
-                        if(!(_.includes(exclude, id))) {
-                            for (let j = 0; j < visits; j++) {
-                                string += "(:action visit-v" + j + "-" + id + "\n\t\t";
-                                string += ":precondition (and (cur_state " + attr2room[id] + ") (cur_state v" + j + ") (not (visited att_" + id + ")))\n\t\t";
-                                string += ":effect (and (cur_state v" + (j + 1) + ") (not (cur_state v" + j + ")) (visited att_" + id +") (increase (total-cost) " + cost +"))\n\t)\n\t";
+                                    string += "(:action move-" + next + "-" + src + "\n\t\t";
+                                    string += ":precondition (cur_state " + next + ")\n\t\t";
+                                    string += ":effect (and (cur_state " + src + ") (not(cur_state " + next + ")) ";
+                                    string += "(increase (total-cost) " + minutes + "))\n\t)\n\t";
+                                    fs.appendFileSync(domainFile, string, 'utf8');
+                                });
                             }
-                        }
-                    });
-                    fs.appendFileSync(domainFile,string,'utf8');
-                    callback();
-                },
-                //Write the rest of the domain file
-                function(callback) {
-                    var string;
-                    var adjPath = __dirname + "/adjacencies/" + attractions[0].areaM.museum.city.name + "/" + attractions[0].areaM.museum.name;
-                    var json = fs.readFileSync(adjPath,'utf-8');
-                    var adj = JSON.parse(json);
-                    _.forIn(adj, function(value,key) {
-                        var minutes = 1;
-                        if(key !== "start" && key !== "end") {
-                            var src = key;
-                            _.forEach(value, function(next) {
-                                string = "(:action move-" + src + "-" + next + "\n\t\t";
-                                string += ":precondition (cur_state " + src + ")\n\t\t";
-                                string += ":effect (and (cur_state " + next + ") (not(cur_state " + src + ")) ";
-                                string += "(increase (total-cost) " + minutes + "))\n\t)\n\t";
-
-                                string += "(:action move-" + next + "-" + src + "\n\t\t";
-                                string += ":precondition (cur_state " + next + ")\n\t\t";
-                                string += ":effect (and (cur_state " + src + ") (not(cur_state " + next + ")) ";
-                                string += "(increase (total-cost) " + minutes + "))\n\t)\n\t";
-                                fs.appendFileSync(domainFile, string, 'utf8');
-                            });
-                        }
-                    });
-                    callback();
-                },
-                //write the closing bracket of the domain file
-                function(callback) {
-                    fs.appendFileSync(domainFile, "\n)", 'utf-8');
-                    logger.info("Domain computed");
-                    callback();
-                },
-                //Call the planner
-                function(callback) {
-                    goalAndPlanner();
-                    callback();
-                }
-            ], function(err) {
-                if(err) {
-                    logger.info(err);
-                    res.send(500).end();
-                    return;
-                }
+                        });
+                        callback();
+                    },
+                    //write the closing bracket of the domain file
+                    function(callback) {
+                        fs.appendFileSync(domainFile, "\n)", 'utf-8');
+                        logger.info("Domain computed");
+                        callback();
+                    },
+                    //Call the planner
+                    function(callback) {
+                        goalAndPlanner();
+                        callback();
+                    }
+                ], function(err) {
+                    if(err) {
+                        logger.info(err);
+                        res.send(500).end();
+                        return;
+                    }
+                });
             });
         }
     });
@@ -1371,6 +723,179 @@ app.post('/compute-plan-museum', function(req, res) {
             }); //fine exec
     } //fine Goal&Planner
 }); //fine compute-plan-museum
+/* REPORT */
+app.post('/report_queue', function(req, res) {
+    pathName = '[' + req.path + '] ';
+    var category = req.body.category;
+    var attrId = req.body.attractionId;
+    var minutes = req.body.minutes;
+    var dd = req.body.data; // aggiungerla in sensing
+
+    // se esiste una tupla in tcoda di colosseo 10' non devo aggiungere in tcoda ma solo in sensing
+	logger.info(pathName + "category: %s", category);
+    var reqUrl = serverName;
+    var reqBody = {minutes: minutes};
+    if (category === 'city') {
+        reqUrl += "queue/";
+        reqBody.attractionC = {id: attrId};
+    } else {
+        reqUrl += "queue/";
+        reqBody.attractionM = {id: attrId};
+    }
+    //reqUrl += attrId + "," + minutes;
+    logger.info(JSON.stringify(reqBody));
+
+    request({
+        url: reqUrl,
+        method: "POST",
+        json: reqBody,
+        headers: [{
+            'content-type': 'application/json'
+        }]
+    }, function(error,response,body) {
+        logger.info("Request statusCode: " + response.statusCode);
+        if (!error && response.statusCode === 201) {
+            logger.info(response.statusCode, "*** Tcoda added  *** ");
+            var tqueueId;
+            var loc = response.headers.location;
+            var id = loc.match(regex);
+            tqueueId = id[0];
+            request({
+                url: serverName + "sensing/",
+                method: "POST",
+                json: {
+                    data: dd,
+                    TQueue: {
+                        id: tqueueId
+                    }
+                },
+                headers: [{
+                    'content-type': 'application/json'
+                }]
+            }, function(error, response, body) {
+                logger.info("Request statusCode: " + response.statusCode);
+                //logger.info("*** response ", response);
+                if (!error & response.statusCode === 204) {
+                    logger.info("*** Post only in sensing succeded *** ");
+                    res.sendStatus(201);
+                }
+            });
+        }
+    });
+}); // route_queue
+
+app.post('/report_visit', function(req,res) {
+    pathName = '[' + req.path + '] ';
+    var category = req.body.category;
+    var attrId = req.body.attractionId;
+    var minutes = req.body.minutes;
+    var dd = req.body.data; // aggiungerla in sensing
+
+    // se esiste una tupla in tcoda di colosseo 10' non devo aggiungere in tcoda ma solo in sensing
+	logger.info(pathName + "category: %s", category);
+    var reqUrl = serverName + "visit/";
+    var reqBody = {minutes: minutes};
+    if (category === 'city')
+        reqBody.attractionC = {id: attrId};
+    else
+        reqBody.attractionM = {id: attrId};
+    //reqUrl += attrId + "," + minutes;
+    logger.info(JSON.stringify(reqBody));
+
+    request({
+        url: reqUrl,
+        method: "POST",
+        json: reqBody,
+        headers: [{
+            'content-type': 'application/json'
+        }]
+    }, function(error,response,body) {
+        logger.info("Request statusCode: " + response.statusCode);
+        if (!error && response.statusCode === 201) {
+            logger.info(response.statusCode, "*** Tvisita added  *** ");
+            var tvisitId;
+            var loc = response.headers.location;
+            var id = loc.match(regex);
+            tvisitId = id[0];
+            request({
+                url: serverName + "sensing/",
+                method: "POST",
+                json: {
+                    data: dd,
+                    TVisit: {
+                        id: tvisitId
+                    }
+                },
+                headers: [{
+                    'content-type': 'application/json'
+                }]
+            }, function(error, response, body) {
+                logger.info("Request statusCode: " + response.statusCode);
+                if (!error & response.statusCode === 204) {
+                    logger.info("*** Post only in sensing succeded *** ");
+                    res.sendStatus(201);
+                }
+            });
+        }
+    });
+
+});
+
+app.post('/report_rating', function(req,res) {
+    pathName = '[' + req.path + '] ';
+    var category = req.body.category;
+    var type = req.body.type;
+    var attrId = req.body.attractionId;
+    var rating = +req.body.rating;
+    var dd = req.body.data; // aggiungerla in sensing
+
+	logger.info(pathName + "category: %s", category);
+    var reqUrl = serverName + "rating/";
+    var reqBody = {rating: rating};
+    if (category === 'city')
+        reqBody.attractionC = {id: attrId};
+    else
+        reqBody.attractionM = {id: attrId};
+    logger.info(JSON.stringify(reqBody));
+
+    request({
+        url: reqUrl,
+        method: "POST",
+        json: reqBody,
+        headers: [{
+            'content-type': 'application/json'
+        }]
+    }, function(error,response,body) {
+        logger.info("Request statusCode: " + response.statusCode);
+        if (!error && response.statusCode === 201) {
+            logger.info(response.statusCode, "Rating for attractionId ", attrId, "added");
+            var ratingId;
+            var loc = response.headers.location;
+            var id = loc.match(regex);
+            ratingId = id[0];
+            request({
+                url: serverName + "sensing/",
+                method: "POST",
+                json: {
+                    data: dd,
+                    rating: {
+                        id: ratingId
+                    }
+                },
+                headers: [{
+                    'content-type': 'application/json'
+                }]
+            }, function(error, response, body) {
+                logger.info("Request statusCode: " + response.statusCode);
+                //logger.info("*** response ", response);
+                if (!error & response.statusCode === 204) {
+                    logger.info("*** Post only in sensing succeded *** ");
+                    res.sendStatus(201);
+                }
+            });
+        }
+    });
+});
 
 app.post('/avg_queue_time', function(req, res) {
     pathName = '[' + req.path + '] ';
